@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, ForeignKey, DateTime, Float
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
@@ -7,15 +7,14 @@ from datetime import datetime
 class EstabelecimentoPreferencia(Base):
     """
     Modelo ORM para relacionamento Estabelecimento-Preferencia
-    Usado para Content-Based Filtering - características dos estabelecimentos
-    Esqueleto - campos serão definidos conforme necessidades do modelo LightFM
+    Item features para o LightFM (características dos estabelecimentos)
+    Usado para CBF - metadados essenciais
     """
     __tablename__ = "estabelecimento_preferencia"
 
     id = Column(Integer, primary_key=True, index=True)
+    id_estabelecimento = Column(Integer, ForeignKey("estabelecimentos.id_estabelecimento"), nullable=False)
+    id_preferencia = Column(Integer, ForeignKey("preferencias.id_preferencia"), nullable=False)
+    peso = Column(Float, default=1.0)  # Intensidade da característica (1-5)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Adicionar campos específicos aqui conforme necessário para o modelo
-    # Ex: estabelecimento_id = Column(Integer, ForeignKey("estabelecimentos.id"))
-    # Ex: preferencia_id = Column(Integer, ForeignKey("preferencias.id"))

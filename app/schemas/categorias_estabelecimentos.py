@@ -6,9 +6,8 @@ from typing import Optional
 class CategoriasEstabelecimentosBase(BaseModel):
     """
     Schema base para Categorias de Estabelecimentos
-    Esqueleto - campos serão definidos conforme necessidades do modelo LightFM
     """
-    pass
+    nome_categoria: str
 
 
 class CategoriasEstabelecimentosCreate(CategoriasEstabelecimentosBase):
@@ -18,11 +17,11 @@ class CategoriasEstabelecimentosCreate(CategoriasEstabelecimentosBase):
     pass
 
 
-class CategoriasEstabelecimentosUpdate(CategoriasEstabelecimentosBase):
+class CategoriasEstabelecimentosUpdate(BaseModel):
     """
     Schema para atualização de Categoria de Estabelecimento
     """
-    pass
+    nome_categoria: Optional[str] = None
 
 
 class CategoriasEstabelecimentosResponse(CategoriasEstabelecimentosBase):

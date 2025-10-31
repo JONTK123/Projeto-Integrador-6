@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 from datetime import datetime
 from typing import Optional
 
@@ -6,9 +6,14 @@ from typing import Optional
 class EstabelecimentosBase(BaseModel):
     """
     Schema base para Estabelecimentos
-    Esqueleto - campos serão definidos conforme necessidades do modelo LightFM
     """
-    pass
+    descricao: str
+    endereco: str
+    cidade: str
+    horario_funcionamento: Optional[str] = None
+    dono_nome: Optional[str] = None
+    dono_email: Optional[EmailStr] = None
+    id_categoria: Optional[int] = None
 
 
 class EstabelecimentosCreate(EstabelecimentosBase):
@@ -18,11 +23,17 @@ class EstabelecimentosCreate(EstabelecimentosBase):
     pass
 
 
-class EstabelecimentosUpdate(EstabelecimentosBase):
+class EstabelecimentosUpdate(BaseModel):
     """
     Schema para atualização de Estabelecimento
     """
-    pass
+    descricao: Optional[str] = None
+    endereco: Optional[str] = None
+    cidade: Optional[str] = None
+    horario_funcionamento: Optional[str] = None
+    dono_nome: Optional[str] = None
+    dono_email: Optional[EmailStr] = None
+    id_categoria: Optional[int] = None
 
 
 class EstabelecimentosResponse(EstabelecimentosBase):

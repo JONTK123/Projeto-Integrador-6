@@ -4,13 +4,15 @@ from app.core.database import Base
 from datetime import datetime
 
 
-class CategoriasEstabelecimentos(Base):
+class Universidades(Base):
     """
-    Modelo ORM para Categorias de Estabelecimentos
+    Modelo ORM para Universidades
     """
-    __tablename__ = "categorias_estabelecimentos"
+    __tablename__ = "universidades"
 
-    id = Column(Integer, primary_key=True, index=True, name="id_categoria")
-    nome_categoria = Column(String(100), nullable=False, unique=True)
+    id = Column(Integer, primary_key=True, index=True, name="id_universidade")
+    nome = Column(String(255), nullable=False)
+    cidade = Column(String(100), nullable=False)
+    estado = Column(String(2), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Optional
 
@@ -6,9 +6,10 @@ from typing import Optional
 class UsuarioPreferenciaBase(BaseModel):
     """
     Schema base para Usuario-Preferencia
-    Esqueleto - campos serão definidos conforme necessidades do modelo LightFM
     """
-    pass
+    id_usuario: int
+    id_preferencia: int
+    peso: float = Field(default=1.0, ge=1.0, le=5.0)  # Peso entre 1 e 5
 
 
 class UsuarioPreferenciaCreate(UsuarioPreferenciaBase):
@@ -18,11 +19,11 @@ class UsuarioPreferenciaCreate(UsuarioPreferenciaBase):
     pass
 
 
-class UsuarioPreferenciaUpdate(UsuarioPreferenciaBase):
+class UsuarioPreferenciaUpdate(BaseModel):
     """
     Schema para atualização de associação Usuario-Preferencia
     """
-    pass
+    peso: Optional[float] = Field(default=None, ge=1.0, le=5.0)
 
 
 class UsuarioPreferenciaResponse(UsuarioPreferenciaBase):

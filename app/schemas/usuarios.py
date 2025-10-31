@@ -1,28 +1,38 @@
-from pydantic import BaseModel, ConfigDict
-from datetime import datetime
+from pydantic import BaseModel, ConfigDict, EmailStr
+from datetime import datetime, date
 from typing import Optional
 
 
 class UsuariosBase(BaseModel):
     """
     Schema base para Usuários
-    Esqueleto - campos serão definidos conforme necessidades do modelo LightFM
     """
-    pass
+    nome: str
+    email: EmailStr
+    curso: Optional[str] = None
+    idade: Optional[int] = None
+    descricao: Optional[str] = None
+    id_universidade: Optional[int] = None
 
 
 class UsuariosCreate(UsuariosBase):
     """
     Schema para criação de Usuário
     """
-    pass
+    senha_hash: str  # Em produção, hash a senha antes de armazenar
 
 
-class UsuariosUpdate(UsuariosBase):
+class UsuariosUpdate(BaseModel):
     """
     Schema para atualização de Usuário
     """
-    pass
+    nome: Optional[str] = None
+    email: Optional[EmailStr] = None
+    curso: Optional[str] = None
+    idade: Optional[int] = None
+    descricao: Optional[str] = None
+    id_universidade: Optional[int] = None
+    senha_hash: Optional[str] = None
 
 
 class UsuariosResponse(UsuariosBase):
@@ -30,6 +40,7 @@ class UsuariosResponse(UsuariosBase):
     Schema de resposta para Usuário
     """
     id: int
+    data_cadastro: date
     created_at: datetime
     updated_at: datetime
 

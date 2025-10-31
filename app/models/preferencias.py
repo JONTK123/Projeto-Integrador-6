@@ -7,12 +7,12 @@ from datetime import datetime
 class Preferencias(Base):
     """
     Modelo ORM para Preferências
-    Esqueleto - campos serão definidos conforme necessidades do modelo LightFM
+    Features para Content-Based Filtering no LightFM
     """
     __tablename__ = "preferencias"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, name="id_preferencia")
+    nome_preferencia = Column(String(100), nullable=False)
+    tipo_preferencia = Column(String(50), nullable=False)  # Ex: 'Alimentação', 'Ambiente', 'Lazer', etc.
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Adicionar campos específicos aqui conforme necessário para o modelo

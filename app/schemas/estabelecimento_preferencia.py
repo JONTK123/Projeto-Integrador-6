@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Optional
 
@@ -6,9 +6,10 @@ from typing import Optional
 class EstabelecimentoPreferenciaBase(BaseModel):
     """
     Schema base para Estabelecimento-Preferencia
-    Esqueleto - campos serão definidos conforme necessidades do modelo LightFM
     """
-    pass
+    id_estabelecimento: int
+    id_preferencia: int
+    peso: float = Field(default=1.0, ge=1.0, le=5.0)  # Intensidade entre 1 e 5
 
 
 class EstabelecimentoPreferenciaCreate(EstabelecimentoPreferenciaBase):
@@ -18,11 +19,11 @@ class EstabelecimentoPreferenciaCreate(EstabelecimentoPreferenciaBase):
     pass
 
 
-class EstabelecimentoPreferenciaUpdate(EstabelecimentoPreferenciaBase):
+class EstabelecimentoPreferenciaUpdate(BaseModel):
     """
     Schema para atualização de associação Estabelecimento-Preferencia
     """
-    pass
+    peso: Optional[float] = Field(default=None, ge=1.0, le=5.0)
 
 
 class EstabelecimentoPreferenciaResponse(EstabelecimentoPreferenciaBase):
