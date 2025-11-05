@@ -9,7 +9,7 @@ load_dotenv()
 # PostgreSQL connection URL
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://user:password@localhost:5432/lightfm_recommendations"
+    "postgresql://filipemota:filipemota@synapse-database.cbsymmi08a0x.sa-east-1.rds.amazonaws.com:5432/postgres"
 )
 
 engine = create_engine(DATABASE_URL)
