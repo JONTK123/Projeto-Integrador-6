@@ -132,3 +132,15 @@ dmypy.json
 # Database
 *.db
 *.sqlite
+
+# Model files (treinados)
+models/
+*.pkl
+*.joblib
+
+# Logs
+*.log
+server.log
+
+# Test results
+resultados_testes.json

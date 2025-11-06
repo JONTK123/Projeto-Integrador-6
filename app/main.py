@@ -3,20 +3,35 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import usuarios, estabelecimentos, preferencias, recomendacoes
 
 app = FastAPI(
-    title="Sistema de Recomendação LightFM",
+    title="Sistema de Recomendação - LightFM & Surprise",
     description="""
-    API para Sistema de Recomendação Híbrido usando LightFM.
+    API para Sistema de Recomendação usando LightFM e Surprise.
     
+    ## Algoritmos Disponíveis
+    
+    ### LightFM (Híbrido)
     Combina Content-Based Filtering (CBF) e Collaborative Filtering (CF) 
     para recomendar estabelecimentos personalizados para usuários universitários.
-    
-    ## Funcionalidades
     
     * **CBF**: Baseado em características dos estabelecimentos e preferências do usuário
     * **CF**: Baseado em padrões de comportamento entre usuários
     * **Híbrido**: Combina ambas as estratégias para melhor performance
+    * **Cold Start**: Resolve através de features/preferências
+    
+    ### Surprise (CF Puro)
+    Biblioteca focada em algoritmos de Collaborative Filtering.
+    
+    * **Algoritmos**: SVD, KNN, Baseline, CoClustering
+    * **Ideal para**: Comparação e baseline
+    * **Uso**: Quando há apenas histórico de interações
+    
+    ## Funcionalidades
+    
+    * **Recomendações Personalizadas**: Para cada usuário
     * **Cold Start**: Suporte para usuários e estabelecimentos novos
     * **Contextual**: Recomendações baseadas em localização e tempo
+    * **Diversidade**: Evita bolha de filtro
+    * **Comparação**: Compare resultados de ambos os algoritmos
     """,
     version="1.0.0",
     contact={
