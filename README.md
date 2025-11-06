@@ -7,6 +7,30 @@
 
 Sistema de recomendação híbrido desenvolvido com **FastAPI**, **LightFM** e **Surprise** para recomendar estabelecimentos personalizados para usuários universitários, combinando **Content-Based Filtering (CBF)** e **Collaborative Filtering (CF)**.
 
+### 🚀 Início Rápido
+
+```bash
+# 1. Iniciar servidor
+bash iniciar_servidor.sh
+
+# 2. Treinar Surprise (funciona via API)
+curl -X POST "http://localhost:8000/recomendacoes/treinar" \
+  -H "Content-Type: application/json" \
+  -d '{"algoritmo": "surprise", "algorithm": "svd"}'
+
+# 3. Testar tudo
+python scripts/teste_completo_usuario.py
+```
+
+### ⚡ Estado Atual
+
+- ✅ **Surprise**: 100% funcional via API (VENV)
+- ⚠️ **LightFM**: Funciona manualmente via Conda, requer ajustes para API quando servidor roda como root
+- ✅ **Scripts**: Todos funcionais e documentados
+- ✅ **API**: Todas as rotas implementadas e testadas
+
+**📖 Veja seção [Estado Atual](#-treinamento-dos-modelos) para detalhes completos e soluções para LightFM.**
+
 ---
 
 ## 📋 Sumário
@@ -130,10 +154,9 @@ Projeto-Integrador-6/
 ├── 📁 scripts/                      # Scripts auxiliares
 │   ├── criar_banco.py               # Criar banco de dados
 │   ├── seed_data.sql                # Dados iniciais (usado nas migrações)
-│   ├── testar_tudo.py               # Script de testes completo
-│   ├── teste_definitivo.py          # Teste definitivo de todas as rotas
-│   ├── teste_usuario_final.py       # Teste como usuário final
-│   └── treinar_lightfm_py311.py     # Treinar LightFM
+│   ├── teste_completo_usuario.py      # Script completo de teste via API
+│   ├── lightfm_train.py               # Script para treinar LightFM via Conda
+│   └── lightfm_predict.py             # Script para predições LightFM via Conda
 │
 ├── 📁 models/                       # Modelos treinados (gitignored)
 │   ├── lightfm_model.pkl
@@ -151,18 +174,24 @@ Projeto-Integrador-6/
 ### Pré-requisitos
 
 - **Python 3.12** (para ambiente principal)
-- **Conda** (para LightFM com Python 3.11)
+- **Conda** ou **Miniconda** (para LightFM com Python 3.11)
 - **PostgreSQL 12+** (local ou AWS RDS)
 - **Git**
 
-### 1. Clonar o Repositório
+### Instalação Rápida
+
+Para uma instalação completa e automatizada, veja **[INSTALACAO.md](INSTALACAO.md)**.
+
+### Instalação Manual
+
+#### 1. Clonar o Repositório
 
 ```bash
 git clone https://github.com/JONTK123/Projeto-Integrador-6.git
 cd Projeto-Integrador-6
 ```
 
-### 2. Criar Ambiente Virtual (Python 3.12)
+#### 2. Criar Ambiente Virtual (Python 3.12)
 
 ```bash
 python3 -m venv venv
@@ -171,26 +200,31 @@ source venv/bin/activate  # Linux/Mac
 venv\Scripts\activate  # Windows
 ```
 
-### 3. Instalar Dependências
+#### 3. Instalar Dependências
 
 ```bash
 pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-### 4. Configurar LightFM (Conda)
+#### 4. Configurar LightFM (Conda)
 
 ```bash
 # Criar ambiente Conda com Python 3.11
 conda create -n lightfm_py311 python=3.11 -y
 conda activate lightfm_py311
 
-# Instalar LightFM e dependências
-pip install lightfm fastapi sqlalchemy pydantic python-dotenv psycopg2-binary pandas numpy scipy joblib
+# Instalar pacotes científicos via Conda (recomendado)
+conda install -y numpy scipy scikit-learn pandas -c conda-forge
+
+# Instalar LightFM e dependências do projeto
+pip install lightfm fastapi sqlalchemy pydantic python-dotenv psycopg2-binary joblib
 
 # Desativar ambiente
 conda deactivate
 ```
+
+**💡 Dica**: O script `iniciar_servidor.sh` detecta automaticamente o Conda e configura tudo!
 
 ---
 
@@ -237,14 +271,24 @@ Este comando irá:
 
 ## 🎓 Treinamento dos Modelos
 
-### Treinar Surprise (via API)
+### ⚠️ Estado Atual dos Algoritmos
 
+#### ✅ Surprise - Funcionando Perfeitamente via VENV
+
+O **Surprise** está **100% funcional** e integrado via API:
+- ✅ Treinamento via API: `POST /recomendacoes/treinar`
+- ✅ Predições via API: `GET /recomendacoes/usuario/{id}?algoritmo=surprise`
+- ✅ Todas funcionalidades disponíveis (cold start, similares, diversidade, contexto)
+- ✅ Funciona diretamente no ambiente VENV (Python 3.12)
+- ✅ Sem necessidade de configuração adicional
+
+**Como usar:**
 ```bash
 # 1. Iniciar servidor
 source venv/bin/activate
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-# 2. Em outro terminal, treinar modelo
+# 2. Treinar modelo via API
 curl -X POST "http://localhost:8000/recomendacoes/treinar" \
   -H "Content-Type: application/json" \
   -d '{
@@ -253,21 +297,91 @@ curl -X POST "http://localhost:8000/recomendacoes/treinar" \
     "n_factors": 50,
     "n_epochs": 20
   }'
+
+# 3. Obter recomendações
+curl "http://localhost:8000/recomendacoes/usuario/101?algoritmo=surprise&top_n=10"
 ```
 
-### Treinar LightFM (via Conda)
+#### ⚠️ LightFM - Requer Integração Correta nas Rotas
 
+O **LightFM** está parcialmente implementado:
+- ✅ Scripts de treinamento e predição criados (`lightfm_train.py`, `lightfm_predict.py`)
+- ✅ Endpoint de treinamento implementado (`POST /recomendacoes/treinar`)
+- ✅ Endpoint de predição implementado (`GET /recomendacoes/usuario/{id}?algoritmo=lightfm`)
+- ⚠️ **Problema**: Quando o servidor roda como root, não consegue executar o Python do Conda
+- ⚠️ **Status**: Funciona quando executado manualmente via Conda, mas não via API quando servidor roda como root
+
+**Como usar manualmente (funciona):**
 ```bash
-# Treinar usando ambiente Conda
-conda run -n lightfm_py311 python scripts/treinar_lightfm_py311.py
+# Treinar LightFM manualmente via Conda
+conda run -n lightfm_py311 python scripts/lightfm_train.py '{"loss":"warp","usar_features":true,"num_epochs":30,"learning_rate":0.05,"num_components":30}'
+
+# Fazer predição manualmente
+conda run -n lightfm_py311 python scripts/lightfm_predict.py 101 10
 ```
 
-### Script de Treinamento Completo
+**Problema identificado:**
+- Quando o servidor FastAPI roda como root (ou em contexto diferente), o `subprocess.run()` não consegue executar o Python do Conda (`/home/thiago/GitHub/miniforge3/envs/lightfm_py311/bin/python3.11`)
+- O arquivo existe e é acessível, mas há problemas de permissão/contexto ao executar
 
+### 🔧 Sugestões para Resolver o Problema do LightFM
+
+#### Opção 1: Executar Servidor como Usuário Normal (Recomendado)
 ```bash
-# Treinar ambos os modelos e testar todas as rotas
-python scripts/testar_tudo.py
+# Em vez de rodar como root, executar como usuário thiago
+su - thiago
+cd /home/thiago/GitHub/Projeto-Integrador-6
+source venv/bin/activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
+
+#### Opção 2: Usar `conda run` em vez de caminho direto
+Modificar `app/api/recomendacoes.py` para usar `conda run`:
+```python
+# Em vez de:
+[conda_python, str(script_path), ...]
+
+# Usar:
+["conda", "run", "-n", "lightfm_py311", "python", str(script_path), ...]
+```
+**Nota**: Já implementado, mas pode não funcionar se `conda` não estiver no PATH do servidor.
+
+#### Opção 3: Criar Wrapper Script com Permissões Especiais
+Criar um script wrapper que seja executável por qualquer usuário:
+```bash
+#!/bin/bash
+# scripts/lightfm_wrapper.sh
+export PATH="/home/thiago/GitHub/miniforge3/bin:$PATH"
+conda run -n lightfm_py311 python "$@"
+```
+
+#### Opção 4: Usar Variável de Ambiente para Caminho do Conda
+Configurar variável de ambiente no sistema:
+```bash
+export CONDA_PYTHON_PATH="/home/thiago/GitHub/miniforge3/envs/lightfm_py311/bin/python3.11"
+```
+E usar no código: `os.environ.get("CONDA_PYTHON_PATH", default_path)`
+
+#### Opção 5: Executar LightFM em Processo Separado (Microserviço)
+Criar um serviço separado que roda LightFM e se comunica via HTTP/Redis:
+- Servidor principal (FastAPI) → Envia requisições
+- Servidor LightFM (separado) → Processa e retorna resultados
+
+### Script de Treinamento Completo (Recomendado)
+
+Use o script completo que testa tudo via API:
+```bash
+# Executar teste completo (funciona com Surprise, LightFM pode falhar se servidor roda como root)
+python scripts/teste_completo_usuario.py
+```
+
+Este script:
+- ✅ Verifica/inicia servidor automaticamente
+- ✅ Treina Surprise via API (funciona)
+- ⚠️ Tenta treinar LightFM via API (pode falhar se servidor roda como root)
+- ✅ Simula usuário com 20+ interações
+- ✅ Testa todas funcionalidades
+- ✅ Compara resultados entre algoritmos
 
 ---
 
@@ -590,8 +704,8 @@ requests.post(
     f"{BASE_URL}/recomendacoes/interacao",
     json={
         "usuario_id": usuario_id,
-        "estabelecimento_id": 203,
-        "tipo_interacao": "visita",
+    "estabelecimento_id": 203,
+    "tipo_interacao": "visita",
         "score": 5
     }
 )
@@ -631,13 +745,13 @@ fetch(`${BASE_URL}/recomendacoes/interacao`, {
 
 ```bash
 # Teste técnico completo (todas as rotas e modelos)
-python scripts/teste_definitivo.py
+python scripts/teste_completo_usuario.py
 
 # Teste como usuário final (fluxo completo de uso)
-python scripts/teste_usuario_final.py
+python scripts/teste_completo_usuario.py
 
 # Teste completo (treinamento + rotas)
-python scripts/testar_tudo.py
+python scripts/teste_completo_usuario.py
 ```
 
 ### Testar Rotas Individualmente
@@ -690,41 +804,56 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ## 📊 Status do Projeto
 
-### ✅ **PROJETO FINALIZADO E FUNCIONANDO**
+### ✅ **PROJETO FUNCIONAL COM SURPRISE - LIGHTFM REQUER AJUSTES**
 
-#### Implementações Concluídas
+#### Estado Atual (Novembro 2024)
 
-- ✅ **Algoritmos**: LightFM e Surprise implementados
-- ✅ **Modelos Treinados**: Ambos os modelos treinados e salvos
-- ✅ **API Completa**: 10 rotas funcionando
-- ✅ **Ambiente Configurado**: Venv (Python 3.12) + Conda (Python 3.11)
-- ✅ **Testes**: Scripts de teste completos
-- ✅ **Documentação**: README completo
+**✅ Surprise - 100% Funcional**
+- ✅ Treinamento via API funcionando perfeitamente
+- ✅ Todas as rotas de recomendação funcionando
+- ✅ Integrado no ambiente VENV (Python 3.12)
+- ✅ Pronto para uso em produção
+
+**⚠️ LightFM - Parcialmente Funcional**
+- ✅ Scripts de treinamento e predição criados
+- ✅ Endpoints implementados na API
+- ⚠️ Problema de execução quando servidor roda como root
+- ✅ Funciona quando executado manualmente via Conda
+- 🔧 Requer ajustes de permissão/contexto para funcionar via API
+
+#### Scripts Importantes
+
+| Script | Descrição | Status |
+|--------|-----------|--------|
+| `teste_completo_usuario.py` | Teste completo via API (Surprise + LightFM) | ✅ Funcional |
+| `lightfm_train.py` | Treinamento LightFM via Conda | ✅ Funcional (manual) |
+| `lightfm_predict.py` | Predições LightFM via Conda | ✅ Funcional (manual) |
+| `iniciar_servidor.sh` | Inicia servidor com configuração automática | ✅ Funcional |
+
+#### Rotas Funcionando
+
+1. ✅ Recomendações personalizadas (Surprise)
+2. ✅ Estabelecimentos similares (Surprise)
+3. ✅ Registrar interações
+4. ✅ Treinar modelos (Surprise via API, LightFM manual)
+5. ✅ Cold start usuário (Surprise)
+6. ✅ Cold start estabelecimento
+7. ✅ Recomendações diversas (Surprise)
+8. ✅ Recomendações contextuais (Surprise)
+9. ✅ Comparar algoritmos
+10. ✅ Health check
 
 #### Métricas dos Modelos
 
 **Surprise (SVD)**:
-- RMSE: 0.97
-- MAE: 0.97
-- Status: ✅ Treinado e funcionando
+- RMSE: ~1.0-1.3
+- MAE: ~0.7-1.0
+- Status: ✅ Treinado e funcionando via API
 
 **LightFM**:
-- Precision@10: 0.14
-- AUC: 0.70
-- Status: ✅ Treinado e funcionando
-
-#### Rotas Funcionando
-
-1. ✅ Recomendações personalizadas
-2. ✅ Estabelecimentos similares
-3. ✅ Registrar interações
-4. ✅ Treinar modelos
-5. ✅ Cold start usuário
-6. ✅ Cold start estabelecimento
-7. ✅ Recomendações diversas
-8. ✅ Recomendações contextuais
-9. ✅ Comparar algoritmos
-10. ✅ Health check
+- Precision@10: ~0.14-0.17
+- AUC: ~0.70-0.74
+- Status: ⚠️ Treinado, mas requer execução manual via Conda
 
 ---
 
@@ -755,30 +884,57 @@ email-validator
 
 ## 🔧 Comandos Úteis
 
-### Treinar Modelos
+### Como Rodar o Sistema
 
+#### 1. Iniciar Servidor
+
+**Opção A: Usando script automatizado (Recomendado)**
 ```bash
-# Surprise (via API)
+cd /home/thiago/GitHub/Projeto-Integrador-6
+bash iniciar_servidor.sh
+```
+
+**Opção B: Manualmente**
+```bash
+# Ativar ambiente virtual
+source venv/bin/activate
+
+# Iniciar servidor
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+**⚠️ Importante**: Para LightFM funcionar via API, execute o servidor como usuário normal (não root):
+```bash
+su - thiago  # Se estiver como root
+cd /home/thiago/GitHub/Projeto-Integrador-6
+source venv/bin/activate
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+#### 2. Treinar Modelos
+
+**Surprise (via API - Funciona):**
+```bash
 curl -X POST "http://localhost:8000/recomendacoes/treinar" \
   -H "Content-Type: application/json" \
-  -d '{"algoritmo": "surprise", "algorithm": "svd"}'
-
-# LightFM (via Conda)
-conda run -n lightfm_py311 python scripts/treinar_lightfm_py311.py
+  -d '{"algoritmo": "surprise", "algorithm": "svd", "n_factors": 50, "n_epochs": 20}'
 ```
 
-### Testar Sistema
+**LightFM (manual via Conda - Funciona):**
+```bash
+conda run -n lightfm_py311 python scripts/lightfm_train.py '{"loss":"warp","usar_features":true,"num_epochs":30,"learning_rate":0.05,"num_components":30}'
+```
+
+#### 3. Executar Testes Completos
 
 ```bash
-# Teste definitivo (todas as rotas)
-python scripts/teste_definitivo.py
-
-# Teste como usuário final
-python scripts/teste_usuario_final.py
-
-# Teste completo (treinamento + rotas)
-python scripts/testar_tudo.py
+# Teste completo via API (Surprise funciona, LightFM pode falhar se servidor roda como root)
+python scripts/teste_completo_usuario.py
 ```
+
+#### 4. Acessar Documentação
+
+Abra no navegador: **http://localhost:8000/docs**
 
 ### Verificar Modelos Treinados
 
@@ -814,9 +970,13 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info
 
 ### Para Testadores
 
-1. **Teste técnico**: `python scripts/teste_definitivo.py`
-2. **Teste de usuário**: `python scripts/teste_usuario_final.py`
-3. **Teste completo**: `python scripts/testar_tudo.py`
+**Teste completo**: `python scripts/teste_completo_usuario.py`
+
+Este script executa todos os testes via API:
+- Treina modelos Surprise e LightFM
+- Simula usuário com 20+ interações
+- Testa todas as funcionalidades (cold start, recomendações, similares, diversidade, contexto)
+- Compara resultados entre algoritmos
 
 ---
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import List, Optional, Dict
 from app.core.database import get_db
 from pydantic import BaseModel
 try:
@@ -15,12 +15,98 @@ from app.models.recomendacao_estabelecimento import RecomendacaoEstabelecimento
 from app.models.usuarios import Usuarios
 from app.models.estabelecimentos import Estabelecimentos
 from datetime import datetime
+import subprocess
+import json
+import os
+from pathlib import Path
+from typing import Tuple
 
 router = APIRouter(prefix="/recomendacoes", tags=["Recomendações"])
 
 # Instâncias globais dos serviços (singleton)
-lightfm_service = LightFMService() if LIGHTFM_AVAILABLE else None
+lightfm_service = None
+if LIGHTFM_AVAILABLE:
+    try:
+        lightfm_service = LightFMService()
+        # Tentar carregar modelo se existir
+        try:
+            lightfm_service.load_model()
+            print("✅ LightFM: Modelo carregado com sucesso!")
+        except FileNotFoundError:
+            print("ℹ️  LightFM: Modelo ainda não foi treinado")
+        except Exception as e:
+            print(f"⚠️  LightFM: Erro ao carregar modelo: {e}")
+    except Exception as e:
+        print(f"⚠️  LightFM Service não pôde ser inicializado: {e}")
+        LIGHTFM_AVAILABLE = False
+else:
+    print("⚠️  LightFM não está disponível no ambiente principal (venv)")
+    print("   O modelo será treinado/usado via Conda quando necessário")
+
 surprise_service = SurpriseService()
+
+# Caminho do Python do Conda para LightFM
+CONDA_PYTHON_PATH = Path("/home/thiago/GitHub/miniforge3/envs/lightfm_py311/bin/python3.11")
+
+def predict_lightfm_via_conda(user_id: int, num_items: int, db: Session) -> List[Tuple[int, float]]:
+    """Faz predição LightFM via Conda quando não está disponível no venv"""
+    script_path = Path(__file__).parent.parent / "scripts" / "lightfm_predict.py"
+    
+    # Usar caminho absoluto do Conda (sabemos que funciona)
+    # Se servidor roda como root, ainda consegue acessar este caminho
+    conda_python = "/home/thiago/GitHub/miniforge3/envs/lightfm_py311/bin/python3.11"
+    
+    # Verificar se existe (mas usar mesmo se não conseguir verificar)
+    try:
+        if not Path(conda_python).exists():
+            # Tentar detectar dinamicamente
+            try:
+                import subprocess as sp
+                conda_base = sp.run(["conda", "info", "--base"], capture_output=True, text=True, timeout=5)
+                if conda_base.returncode == 0:
+                    conda_base_path = conda_base.stdout.strip()
+                    alt_path = f"{conda_base_path}/envs/lightfm_py311/bin/python3.11"
+                    if Path(alt_path).exists():
+                        conda_python = alt_path
+            except:
+                pass
+    except:
+        # Se não conseguir verificar, usar o caminho mesmo assim
+        pass
+    
+    try:
+        result = subprocess.run(
+            [conda_python, str(script_path), str(user_id), str(num_items)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=str(Path(__file__).parent.parent),
+            env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent))
+        )
+        
+        if result.returncode == 0:
+            predictions = json.loads(result.stdout)
+            return [(int(item_id), float(score)) for item_id, score in predictions]
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erro ao executar LightFM via Conda: {result.stderr}"
+            )
+    except json.JSONDecodeError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao parsear resultado do LightFM: {result.stdout if 'result' in locals() else str(e)}"
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Python do Conda não encontrado: {str(e)}. Verifique se o ambiente lightfm_py311 está instalado."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao executar LightFM via Conda: {str(e)}"
+        )
 
 
 class RecomendacaoItem(BaseModel):
@@ -57,6 +143,128 @@ class TreinarRequest(BaseModel):
     num_components: Optional[int] = None
 
 
+def train_lightfm_via_conda(request: TreinarRequest) -> Dict:
+    """Treina LightFM via Conda quando não está disponível no venv"""
+    script_path = Path(__file__).parent.parent / "scripts" / "lightfm_train.py"
+    
+    # Usar caminho absoluto do Conda (sabemos que funciona)
+    # Se servidor roda como root, ainda consegue acessar este caminho
+    conda_python = "/home/thiago/GitHub/miniforge3/envs/lightfm_py311/bin/python3.11"
+    
+    # Verificar se existe (mas usar mesmo se não conseguir verificar)
+    try:
+        if not Path(conda_python).exists():
+            # Tentar detectar dinamicamente
+            try:
+                import subprocess as sp
+                conda_base = sp.run(["conda", "info", "--base"], capture_output=True, text=True, timeout=5)
+                if conda_base.returncode == 0:
+                    conda_base_path = conda_base.stdout.strip()
+                    alt_path = f"{conda_base_path}/envs/lightfm_py311/bin/python3.11"
+                    if Path(alt_path).exists():
+                        conda_python = alt_path
+            except:
+                pass
+    except:
+        # Se não conseguir verificar, usar o caminho mesmo assim
+        pass
+    
+    # Preparar parâmetros em JSON
+    params = {
+        "loss": request.loss,
+        "usar_features": request.usar_features,
+        "num_epochs": request.num_epochs or 30,
+        "learning_rate": request.learning_rate or 0.05,
+        "num_components": request.num_components or 30
+    }
+    params_json = json.dumps(params)
+    
+    # Tentar usar conda run primeiro (mais confiável)
+    result = None
+    try:
+        result = subprocess.run(
+            ["conda", "run", "-n", "lightfm_py311", "python", str(script_path), params_json],
+            capture_output=True,
+            text=True,
+            timeout=600,
+            cwd=str(Path(__file__).parent.parent),
+            env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent))
+        )
+    except FileNotFoundError:
+        # Se conda não estiver no PATH, tentar caminho direto
+        try:
+            result = subprocess.run(
+                [conda_python, str(script_path), params_json],
+                capture_output=True,
+                text=True,
+                timeout=600,
+                cwd=str(Path(__file__).parent.parent),
+                env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent))
+            )
+        except FileNotFoundError as e:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Python do Conda não encontrado: {str(e)}. Verifique se o ambiente lightfm_py311 está instalado."
+            )
+    
+    if result is None:
+        raise HTTPException(
+            status_code=500,
+            detail="Erro ao executar treinamento LightFM via Conda"
+        )
+    
+    try:
+        
+        if result.returncode == 0:
+            try:
+                response_data = json.loads(result.stdout)
+                if response_data.get("success"):
+                    return {
+                        "message": response_data.get("message", "Modelo LightFM treinado com sucesso"),
+                        "algoritmo": "lightfm",
+                        "metricas": response_data.get("metricas", {})
+                    }
+                else:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Erro ao treinar LightFM via Conda: {response_data.get('error', 'Erro desconhecido')}"
+                    )
+            except json.JSONDecodeError:
+                # Se não conseguir parsear JSON, tentar ler stderr
+                error_msg = result.stderr if result.stderr else result.stdout
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Erro ao parsear resposta do treinamento LightFM: {error_msg}"
+                )
+        else:
+            # Tentar parsear erro em JSON
+            try:
+                error_data = json.loads(result.stderr)
+                error_msg = error_data.get("error", result.stderr)
+            except:
+                error_msg = result.stderr if result.stderr else result.stdout
+            
+            raise HTTPException(
+                status_code=500,
+                detail=f"Erro ao executar treinamento LightFM via Conda: {error_msg}"
+            )
+    except FileNotFoundError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Python do Conda não encontrado: {str(e)}. Verifique se o ambiente lightfm_py311 está instalado."
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(
+            status_code=504,
+            detail="Timeout ao treinar LightFM via Conda. O treinamento pode estar demorando muito."
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao treinar LightFM via Conda: {str(e)}"
+        )
+
+
 @router.get("/usuario/{usuario_id}", response_model=RecomendacaoResponse)
 def get_recomendacoes_usuario(
     usuario_id: int,
@@ -83,17 +291,16 @@ def get_recomendacoes_usuario(
     
     try:
         if algoritmo.lower() == "lightfm":
-            if not LIGHTFM_AVAILABLE:
-                raise HTTPException(
-                    status_code=503,
-                    detail="LightFM não está disponível. Instale: pip install lightfm"
+            # Tentar usar LightFM do venv primeiro
+            if LIGHTFM_AVAILABLE and lightfm_service is not None and lightfm_service.is_model_loaded():
+                predictions = lightfm_service.predict(
+                    user_id=usuario_id,
+                    num_items=top_n,
+                    db=db
                 )
-            # Usar LightFM
-            predictions = lightfm_service.predict(
-                user_id=usuario_id,
-                num_items=top_n,
-                db=db
-            )
+            else:
+                # Usar LightFM via Conda
+                predictions = predict_lightfm_via_conda(usuario_id, top_n, db)
             algo_name = "lightfm"
         elif algoritmo.lower() == "surprise":
             # Usar Surprise
@@ -295,29 +502,30 @@ def treinar_modelo(
     """
     try:
         if request.algoritmo.lower() == "lightfm":
-            if not LIGHTFM_AVAILABLE or lightfm_service is None:
-                raise HTTPException(
-                    status_code=503,
-                    detail="LightFM não está disponível. Instale: pip install lightfm"
+            # Tentar treinar via VENV primeiro
+            if LIGHTFM_AVAILABLE and lightfm_service is not None:
+                # Treinar LightFM via VENV
+                metrics = lightfm_service.train(
+                    db=db,
+                    loss=request.loss,
+                    use_features=request.usar_features,
+                    num_epochs=request.num_epochs or 30,
+                    learning_rate=request.learning_rate or 0.05,
+                    num_components=request.num_components or 30
                 )
-            # Treinar LightFM
-            metrics = lightfm_service.train(
-                db=db,
-                loss=request.loss,
-                use_features=request.usar_features,
-                num_epochs=request.num_epochs or 30,
-                learning_rate=request.learning_rate or 0.05,
-                num_components=request.num_components or 30
-            )
-            
-            # Salvar modelo
-            lightfm_service.save_model()
-            
-            return {
-                "message": "Modelo LightFM treinado com sucesso",
-                "algoritmo": "lightfm",
-                "metricas": metrics
-            }
+                
+                # Salvar modelo
+                lightfm_service.save_model()
+                
+                return {
+                    "message": "Modelo LightFM treinado com sucesso (via VENV)",
+                    "algoritmo": "lightfm",
+                    "metricas": metrics
+                }
+            else:
+                # Treinar via Conda quando não disponível no VENV
+                print("ℹ️  LightFM não disponível no VENV, treinando via Conda...")
+                return train_lightfm_via_conda(request)
         
         elif request.algoritmo.lower() == "surprise":
             # Treinar Surprise
@@ -690,3 +898,6 @@ def comparar_algoritmos(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+

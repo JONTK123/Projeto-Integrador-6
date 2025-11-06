@@ -503,11 +503,18 @@ class LightFMService:
         if not model_path.exists():
             raise FileNotFoundError(f"Modelo não encontrado: {model_path}")
         
-        data = joblib.load(model_path)
-        self.model = data['model']
-        self.dataset = data['dataset']
-        self.user_id_map = data['user_id_map']
-        self.item_id_map = data['item_id_map']
-        self.reverse_user_map = data['reverse_user_map']
-        self.reverse_item_map = data['reverse_item_map']
+        try:
+            data = joblib.load(model_path)
+            self.model = data['model']
+            self.dataset = data['dataset']
+            self.user_id_map = data['user_id_map']
+            self.item_id_map = data['item_id_map']
+            self.reverse_user_map = data['reverse_user_map']
+            self.reverse_item_map = data['reverse_item_map']
+        except Exception as e:
+            raise ValueError(f"Erro ao carregar modelo: {e}")
+    
+    def is_model_loaded(self) -> bool:
+        """Verifica se o modelo está carregado"""
+        return self.model is not None and self.dataset is not None
 
