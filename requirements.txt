@@ -25,3 +25,9 @@ pydantic[email]==2.5.0
 python-dotenv==1.0.0
 psycopg2-binary==2.9.9
 alembic==1.13.0
+git+https://github.com/lyst/lightfm.git@master
+numpy
+scipy
+scikit-learn
+joblib
+
