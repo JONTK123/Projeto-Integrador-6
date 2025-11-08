@@ -6,7 +6,14 @@ Recebe parâmetros via argumentos de linha de comando e retorna métricas em JSO
 
 import sys
 import json
+import warnings
 from pathlib import Path
+
+# Suprimir warnings do LightFM (especialmente sobre OpenMP) e redirecionar para stderr
+warnings.filterwarnings('ignore')
+# Redirecionar warnings restantes para stderr para não interferir no JSON
+import logging
+logging.captureWarnings(True)
 
 # Adicionar diretório raiz do projeto ao path
 script_dir = Path(__file__).parent

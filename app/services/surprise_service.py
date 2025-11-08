@@ -58,17 +58,27 @@ class SurpriseService:
         Returns:
             Lista de tuplas (user_id, item_id, rating)
         """
-        interactions = db.query(RecomendacaoEstabelecimento).all()
+        # Selecionar apenas colunas que existem (sem created_at e updated_at)
+        from sqlalchemy import select
+        stmt = select(
+            RecomendacaoEstabelecimento.id,
+            RecomendacaoEstabelecimento.id_usuario,
+            RecomendacaoEstabelecimento.id_lugar,
+            RecomendacaoEstabelecimento.score
+        )
         
-        if not interactions:
+        result = db.execute(stmt)
+        rows = result.all()
+        
+        if not rows:
             return []
         
         data = []
-        for interaction in interactions:
+        for row in rows:
             data.append((
-                str(interaction.id_usuario),
-                str(interaction.id_lugar),
-                float(interaction.score)
+                str(row.id_usuario),
+                str(row.id_lugar),
+                float(row.score)
             ))
         
         # Verificar se há dados suficientes

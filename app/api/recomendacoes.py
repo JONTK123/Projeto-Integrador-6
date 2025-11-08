@@ -45,52 +45,252 @@ else:
 
 surprise_service = SurpriseService()
 
-# Caminho do Python do Conda para LightFM
-CONDA_PYTHON_PATH = Path("/home/thiago/GitHub/miniforge3/envs/lightfm_py311/bin/python3.11")
+# Função auxiliar para buscar usuário sem colunas que não existem
+def get_usuario_by_id(db: Session, usuario_id: int):
+    """Busca usuário por ID usando apenas colunas que existem no banco"""
+    from sqlalchemy import select
+    stmt = select(
+        Usuarios.id,
+        Usuarios.nome,
+        Usuarios.email,
+        Usuarios.senha_hash,
+        Usuarios.curso,
+        Usuarios.idade,
+        Usuarios.descricao,
+        Usuarios.id_universidade,
+        Usuarios.data_cadastro
+    ).filter(Usuarios.id == usuario_id)
+    
+    result = db.execute(stmt).first()
+    if not result:
+        return None
+    
+    # Criar objeto Usuarios com os dados
+    usuario = Usuarios()
+    usuario.id = result.id
+    usuario.nome = result.nome
+    usuario.email = result.email
+    usuario.senha_hash = result.senha_hash
+    usuario.curso = result.curso
+    usuario.idade = result.idade
+    usuario.descricao = result.descricao
+    usuario.id_universidade = result.id_universidade
+    usuario.data_cadastro = result.data_cadastro
+    return usuario
+
+# Função auxiliar para buscar estabelecimento sem colunas que não existem
+def get_estabelecimento_by_id(db: Session, estabelecimento_id: int):
+    """Busca estabelecimento por ID usando apenas colunas que existem no banco"""
+    from sqlalchemy import select
+    stmt = select(
+        Estabelecimentos.id,
+        Estabelecimentos.descricao,
+        Estabelecimentos.endereco,
+        Estabelecimentos.cidade,
+        Estabelecimentos.horario_funcionamento,
+        Estabelecimentos.dono_nome,
+        Estabelecimentos.dono_email,
+        Estabelecimentos.id_categoria
+    ).filter(Estabelecimentos.id == estabelecimento_id)
+    
+    result = db.execute(stmt).first()
+    if not result:
+        return None
+    
+    # Criar objeto Estabelecimentos com os dados
+    estabelecimento = Estabelecimentos()
+    estabelecimento.id = result.id
+    estabelecimento.descricao = result.descricao
+    estabelecimento.endereco = result.endereco
+    estabelecimento.cidade = result.cidade
+    estabelecimento.horario_funcionamento = result.horario_funcionamento
+    estabelecimento.dono_nome = result.dono_nome
+    estabelecimento.dono_email = result.dono_email
+    estabelecimento.id_categoria = result.id_categoria
+    return estabelecimento
+
+# Caminho do Python do Conda para LightFM - detectar dinamicamente (cross-platform)
+def get_conda_python_path():
+    """
+    Detecta o caminho do Python do Conda dinamicamente (cross-platform)
+    Suporta: macOS, Linux, Windows
+    """
+    import platform
+    import sys
+    
+    # Verificar variável de ambiente primeiro (mais confiável para grupos)
+    env_path = os.environ.get("CONDA_PYTHON_PATH")
+    if env_path and Path(env_path).exists():
+        return env_path
+    
+    # Detectar sistema operacional
+    system = platform.system()
+    is_windows = system == "Windows"
+    
+    # Tentar detectar via conda info (funciona em todos os sistemas)
+    try:
+        import subprocess as sp
+        conda_base = sp.run(
+            ["conda", "info", "--base"], 
+            capture_output=True, 
+            text=True, 
+            timeout=5,
+            shell=is_windows  # Windows precisa de shell=True
+        )
+        if conda_base.returncode == 0:
+            conda_base_path = conda_base.stdout.strip()
+            
+            # Construir caminho baseado no OS
+            if is_windows:
+                # Windows: envs\lightfm_py311\python.exe
+                python_exe = Path(conda_base_path) / "envs" / "lightfm_py311" / "python.exe"
+                if python_exe.exists():
+                    return str(python_exe)
+                # Tentar python3.11.exe também
+                python_exe = Path(conda_base_path) / "envs" / "lightfm_py311" / "python3.11.exe"
+                if python_exe.exists():
+                    return str(python_exe)
+            else:
+                # Linux/macOS: envs/lightfm_py311/bin/python3.11
+                python_path = Path(conda_base_path) / "envs" / "lightfm_py311" / "bin" / "python3.11"
+                if python_path.exists():
+                    return str(python_path)
+                # Tentar python3 também
+                python_path = Path(conda_base_path) / "envs" / "lightfm_py311" / "bin" / "python3"
+                if python_path.exists():
+                    return str(python_path)
+    except Exception as e:
+        print(f"⚠️  Erro ao detectar Conda via 'conda info': {e}")
+    
+    # Fallback: tentar caminhos comuns baseados no OS
+    home = Path.home()
+    common_paths = []
+    
+    if is_windows:
+        # Windows: Caminhos comuns
+        common_paths = [
+            home / "miniconda3" / "envs" / "lightfm_py311" / "python.exe",
+            home / "anaconda3" / "envs" / "lightfm_py311" / "python.exe",
+            Path("C:/ProgramData/miniconda3/envs/lightfm_py311/python.exe"),
+            Path("C:/ProgramData/anaconda3/envs/lightfm_py311/python.exe"),
+        ]
+    else:
+        # Linux/macOS: Caminhos comuns
+        common_paths = [
+            home / "miniconda3" / "envs" / "lightfm_py311" / "bin" / "python3.11",
+            home / "anaconda3" / "envs" / "lightfm_py311" / "bin" / "python3.11",
+            home / "miniforge3" / "envs" / "lightfm_py311" / "bin" / "python3.11",
+            # macOS Homebrew específico (manter para compatibilidade)
+            Path("/opt/homebrew/Caskroom/miniconda/base/envs/lightfm_py311/bin/python3.11"),
+            Path("/opt/homebrew/Caskroom/miniforge/base/envs/lightfm_py311/bin/python3.11"),
+        ]
+    
+    # Verificar caminhos comuns
+    for path in common_paths:
+        if path.exists():
+            return str(path)
+    
+    # Retornar None se não encontrar
+    return None
+
+CONDA_PYTHON_PATH = get_conda_python_path()
 
 def predict_lightfm_via_conda(user_id: int, num_items: int, db: Session) -> List[Tuple[int, float]]:
     """Faz predição LightFM via Conda quando não está disponível no venv"""
-    script_path = Path(__file__).parent.parent / "scripts" / "lightfm_predict.py"
+    # Script está na raiz do projeto, não em app/scripts
+    script_path = Path(__file__).parent.parent.parent / "scripts" / "lightfm_predict.py"
     
-    # Usar caminho absoluto do Conda (sabemos que funciona)
-    # Se servidor roda como root, ainda consegue acessar este caminho
-    conda_python = "/home/thiago/GitHub/miniforge3/envs/lightfm_py311/bin/python3.11"
+    # Detectar caminho do Conda
+    conda_python = get_conda_python_path()
     
-    # Verificar se existe (mas usar mesmo se não conseguir verificar)
-    try:
-        if not Path(conda_python).exists():
-            # Tentar detectar dinamicamente
-            try:
-                import subprocess as sp
-                conda_base = sp.run(["conda", "info", "--base"], capture_output=True, text=True, timeout=5)
-                if conda_base.returncode == 0:
-                    conda_base_path = conda_base.stdout.strip()
-                    alt_path = f"{conda_base_path}/envs/lightfm_py311/bin/python3.11"
-                    if Path(alt_path).exists():
-                        conda_python = alt_path
-            except:
-                pass
-    except:
-        # Se não conseguir verificar, usar o caminho mesmo assim
-        pass
-    
-    try:
-        result = subprocess.run(
-            [conda_python, str(script_path), str(user_id), str(num_items)],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            cwd=str(Path(__file__).parent.parent),
-            env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent))
+    if not conda_python or not Path(conda_python).exists():
+        raise HTTPException(
+            status_code=503,
+            detail="Python do Conda não encontrado. Verifique se o ambiente lightfm_py311 está instalado."
         )
+    
+    try:
+        # Tentar usar conda run primeiro (mais confiável)
+        try:
+            result = subprocess.run(
+                ["conda", "run", "-n", "lightfm_py311", "python", str(script_path), str(user_id), str(num_items)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=str(Path(__file__).parent.parent.parent),
+                env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent.parent), PYTHONWARNINGS="ignore")
+            )
+        except FileNotFoundError:
+            # Se conda não estiver no PATH, usar caminho direto do Python
+            print(f"ℹ️  Conda não está no PATH, usando Python direto: {conda_python}")
+            result = subprocess.run(
+                [conda_python, str(script_path), str(user_id), str(num_items)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=str(Path(__file__).parent.parent.parent),
+                env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent.parent), PYTHONWARNINGS="ignore")
+            )
+        except Exception as e:
+            # Se conda run falhar, tentar caminho direto
+            print(f"⚠️  Erro ao usar conda run: {e}. Tentando caminho direto...")
+            result = subprocess.run(
+                [conda_python, str(script_path), str(user_id), str(num_items)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                cwd=str(Path(__file__).parent.parent.parent),
+                env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent.parent), PYTHONWARNINGS="ignore")
+            )
         
         if result.returncode == 0:
-            predictions = json.loads(result.stdout)
-            return [(int(item_id), float(score)) for item_id, score in predictions]
+            try:
+                # Tentar encontrar JSON no stdout (pode ter warnings antes)
+                stdout = result.stdout.strip()
+                
+                # Procurar por JSON no stdout (pode ter warnings antes)
+                json_start = stdout.find('[')
+                if json_start == -1:
+                    json_start = stdout.find('{')
+                
+                if json_start == -1:
+                    # Se não encontrar JSON, tentar stderr
+                    error_msg = result.stderr if result.stderr else stdout
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Resposta do LightFM não contém JSON válido: {error_msg[:200]}"
+                    )
+                
+                # Extrair apenas a parte JSON
+                json_str = stdout[json_start:]
+                predictions = json.loads(json_str)
+                
+                # Verificar se é um erro
+                if isinstance(predictions, dict) and "error" in predictions:
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Erro no script LightFM: {predictions['error']}"
+                    )
+                return [(int(item_id), float(score)) for item_id, score in predictions]
+            except json.JSONDecodeError as e:
+                # Se não conseguir parsear, verificar stderr
+                error_msg = result.stderr if result.stderr else result.stdout
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Erro ao parsear resultado do LightFM: {str(e)}. Output: {error_msg[:500]}"
+                )
         else:
+            # Tentar parsear erro em JSON
+            error_msg = result.stderr if result.stderr else result.stdout
+            try:
+                error_data = json.loads(error_msg)
+                if isinstance(error_data, dict) and "error" in error_data:
+                    error_msg = error_data["error"]
+            except:
+                pass
             raise HTTPException(
                 status_code=500,
-                detail=f"Erro ao executar LightFM via Conda: {result.stderr}"
+                detail=f"Erro ao executar LightFM via Conda: {error_msg}"
             )
     except json.JSONDecodeError as e:
         raise HTTPException(
@@ -145,29 +345,17 @@ class TreinarRequest(BaseModel):
 
 def train_lightfm_via_conda(request: TreinarRequest) -> Dict:
     """Treina LightFM via Conda quando não está disponível no venv"""
-    script_path = Path(__file__).parent.parent / "scripts" / "lightfm_train.py"
+    # Script está na raiz do projeto, não em app/scripts
+    script_path = Path(__file__).parent.parent.parent / "scripts" / "lightfm_train.py"
     
-    # Usar caminho absoluto do Conda (sabemos que funciona)
-    # Se servidor roda como root, ainda consegue acessar este caminho
-    conda_python = "/home/thiago/GitHub/miniforge3/envs/lightfm_py311/bin/python3.11"
+    # Detectar caminho do Conda
+    conda_python = get_conda_python_path()
     
-    # Verificar se existe (mas usar mesmo se não conseguir verificar)
-    try:
-        if not Path(conda_python).exists():
-            # Tentar detectar dinamicamente
-            try:
-                import subprocess as sp
-                conda_base = sp.run(["conda", "info", "--base"], capture_output=True, text=True, timeout=5)
-                if conda_base.returncode == 0:
-                    conda_base_path = conda_base.stdout.strip()
-                    alt_path = f"{conda_base_path}/envs/lightfm_py311/bin/python3.11"
-                    if Path(alt_path).exists():
-                        conda_python = alt_path
-            except:
-                pass
-    except:
-        # Se não conseguir verificar, usar o caminho mesmo assim
-        pass
+    if not conda_python or not Path(conda_python).exists():
+        raise HTTPException(
+            status_code=503,
+            detail="Python do Conda não encontrado. Verifique se o ambiente lightfm_py311 está instalado."
+        )
     
     # Preparar parâmetros em JSON
     params = {
@@ -182,29 +370,49 @@ def train_lightfm_via_conda(request: TreinarRequest) -> Dict:
     # Tentar usar conda run primeiro (mais confiável)
     result = None
     try:
-        result = subprocess.run(
+        # Tentar usar conda run se disponível
+        conda_run_result = subprocess.run(
             ["conda", "run", "-n", "lightfm_py311", "python", str(script_path), params_json],
             capture_output=True,
             text=True,
             timeout=600,
-            cwd=str(Path(__file__).parent.parent),
-            env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent))
+            cwd=str(Path(__file__).parent.parent.parent),
+            env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent.parent), PYTHONWARNINGS="ignore")
         )
+        result = conda_run_result
     except FileNotFoundError:
-        # Se conda não estiver no PATH, tentar caminho direto
+        # Se conda não estiver no PATH, tentar caminho direto do Python
+        print(f"ℹ️  Conda não está no PATH, usando Python direto: {conda_python}")
         try:
             result = subprocess.run(
                 [conda_python, str(script_path), params_json],
                 capture_output=True,
                 text=True,
                 timeout=600,
-                cwd=str(Path(__file__).parent.parent),
-                env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent))
+                cwd=str(Path(__file__).parent.parent.parent),
+                env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent.parent), PYTHONWARNINGS="ignore")
             )
         except FileNotFoundError as e:
             raise HTTPException(
                 status_code=503,
                 detail=f"Python do Conda não encontrado: {str(e)}. Verifique se o ambiente lightfm_py311 está instalado."
+            )
+    except Exception as e:
+        # Se conda run falhar, tentar caminho direto
+        print(f"⚠️  Erro ao usar conda run: {e}. Tentando caminho direto...")
+        try:
+            result = subprocess.run(
+                [conda_python, str(script_path), params_json],
+                capture_output=True,
+                text=True,
+                timeout=600,
+                cwd=str(Path(__file__).parent.parent.parent),
+                env=dict(os.environ, PYTHONPATH=str(Path(__file__).parent.parent.parent), PYTHONWARNINGS="ignore")
+            )
+        except Exception as e2:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Erro ao executar LightFM via Conda: {str(e2)}"
             )
     
     if result is None:
@@ -217,7 +425,23 @@ def train_lightfm_via_conda(request: TreinarRequest) -> Dict:
         
         if result.returncode == 0:
             try:
-                response_data = json.loads(result.stdout)
+                # Tentar encontrar JSON no stdout (pode ter warnings antes)
+                stdout = result.stdout.strip()
+                
+                # Procurar por JSON no stdout (pode ter warnings antes)
+                json_start = stdout.find('{')
+                if json_start == -1:
+                    # Se não encontrar {, tentar stderr
+                    error_msg = result.stderr if result.stderr else stdout
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"Resposta do treinamento não contém JSON válido: {error_msg[:200]}"
+                    )
+                
+                # Extrair apenas a parte JSON
+                json_str = stdout[json_start:]
+                response_data = json.loads(json_str)
+                
                 if response_data.get("success"):
                     return {
                         "message": response_data.get("message", "Modelo LightFM treinado com sucesso"),
@@ -229,12 +453,12 @@ def train_lightfm_via_conda(request: TreinarRequest) -> Dict:
                         status_code=500,
                         detail=f"Erro ao treinar LightFM via Conda: {response_data.get('error', 'Erro desconhecido')}"
                     )
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 # Se não conseguir parsear JSON, tentar ler stderr
                 error_msg = result.stderr if result.stderr else result.stdout
                 raise HTTPException(
                     status_code=500,
-                    detail=f"Erro ao parsear resposta do treinamento LightFM: {error_msg}"
+                    detail=f"Erro ao parsear resposta do treinamento LightFM: {str(e)}. Output: {error_msg[:500]}"
                 )
         else:
             # Tentar parsear erro em JSON
@@ -271,6 +495,7 @@ def get_recomendacoes_usuario(
     top_n: int = Query(10, description="Número de recomendações a retornar"),
     tipo: str = Query("hybrid", description="Tipo de recomendação: 'hybrid', 'cbf', 'cf'"),
     algoritmo: str = Query("lightfm", description="Algoritmo: 'lightfm' ou 'surprise'"),
+    usar_conda: bool = Query(False, description="Forçar uso do Conda para LightFM (mesmo se disponível no venv)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -285,22 +510,36 @@ def get_recomendacoes_usuario(
     - **algoritmo**: 'lightfm' (híbrido) ou 'surprise' (CF puro)
     """
     # Verificar se usuário existe
-    usuario = db.query(Usuarios).filter(Usuarios.id == usuario_id).first()
+    usuario = get_usuario_by_id(db, usuario_id)
     if not usuario:
         raise HTTPException(status_code=404, detail=f"Usuário {usuario_id} não encontrado")
     
     try:
         if algoritmo.lower() == "lightfm":
-            # Tentar usar LightFM do venv primeiro
-            if LIGHTFM_AVAILABLE and lightfm_service is not None and lightfm_service.is_model_loaded():
-                predictions = lightfm_service.predict(
-                    user_id=usuario_id,
-                    num_items=top_n,
-                    db=db
-                )
-            else:
-                # Usar LightFM via Conda
+            # Se forçar uso do Conda ou LightFM não disponível no venv
+            if usar_conda or not LIGHTFM_AVAILABLE or lightfm_service is None:
+                if usar_conda:
+                    print("ℹ️  Forçando uso do Conda para LightFM...")
+                else:
+                    print("ℹ️  LightFM não disponível no venv, usando Conda...")
                 predictions = predict_lightfm_via_conda(usuario_id, top_n, db)
+            else:
+                # Tentar usar LightFM do venv primeiro
+                try:
+                    if lightfm_service.is_model_loaded():
+                        predictions = lightfm_service.predict(
+                            user_id=usuario_id,
+                            num_items=top_n,
+                            db=db
+                        )
+                    else:
+                        # Modelo não carregado, usar Conda
+                        print("ℹ️  LightFM modelo não carregado no venv, usando Conda...")
+                        predictions = predict_lightfm_via_conda(usuario_id, top_n, db)
+                except Exception as e:
+                    # Se houver erro no venv, tentar Conda
+                    print(f"⚠️  Erro ao usar LightFM do venv: {e}. Tentando via Conda...")
+                    predictions = predict_lightfm_via_conda(usuario_id, top_n, db)
             algo_name = "lightfm"
         elif algoritmo.lower() == "surprise":
             # Usar Surprise
@@ -319,9 +558,7 @@ def get_recomendacoes_usuario(
         # Buscar informações dos estabelecimentos
         recomendacoes = []
         for estabelecimento_id, score in predictions:
-            estabelecimento = db.query(Estabelecimentos).filter(
-                Estabelecimentos.id == estabelecimento_id
-            ).first()
+            estabelecimento = get_estabelecimento_by_id(db, estabelecimento_id)
             
             razao = None
             if estabelecimento:
@@ -359,9 +596,7 @@ def get_estabelecimentos_similares(
     Útil para "Pessoas que visitaram X também visitaram Y"
     """
     # Verificar se estabelecimento existe
-    estabelecimento = db.query(Estabelecimentos).filter(
-        Estabelecimentos.id == estabelecimento_id
-    ).first()
+    estabelecimento = get_estabelecimento_by_id(db, estabelecimento_id)
     if not estabelecimento:
         raise HTTPException(
             status_code=404,
@@ -370,15 +605,21 @@ def get_estabelecimentos_similares(
     
     try:
         if algoritmo.lower() == "lightfm":
-            if not LIGHTFM_AVAILABLE or lightfm_service is None:
+            if not LIGHTFM_AVAILABLE or lightfm_service is None or not lightfm_service.is_model_loaded():
                 raise HTTPException(
                     status_code=503,
-                    detail="LightFM não está disponível. Instale: pip install lightfm"
+                    detail="LightFM não está disponível ou modelo não foi treinado. Treine o modelo primeiro via POST /recomendacoes/treinar com algoritmo=lightfm"
                 )
-            similar_items = lightfm_service.get_similar_items(
-                item_id=estabelecimento_id,
-                num_items=top_n
-            )
+            try:
+                similar_items = lightfm_service.get_similar_items(
+                    item_id=estabelecimento_id,
+                    num_items=top_n
+                )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Erro ao obter estabelecimentos similares: {str(e)}. Certifique-se de que o modelo foi treinado."
+                )
         elif algoritmo.lower() == "surprise":
             try:
                 similar_items = surprise_service.get_similar_items(
@@ -430,16 +671,14 @@ def registrar_interacao(
     Essencial para treinar os modelos com feedback implícito
     """
     # Verificar se usuário e estabelecimento existem
-    usuario = db.query(Usuarios).filter(Usuarios.id == interacao.usuario_id).first()
+    usuario = get_usuario_by_id(db, interacao.usuario_id)
     if not usuario:
         raise HTTPException(
             status_code=404,
             detail=f"Usuário {interacao.usuario_id} não encontrado"
         )
     
-    estabelecimento = db.query(Estabelecimentos).filter(
-        Estabelecimentos.id == interacao.estabelecimento_id
-    ).first()
+    estabelecimento = get_estabelecimento_by_id(db, interacao.estabelecimento_id)
     if not estabelecimento:
         raise HTTPException(
             status_code=404,
@@ -456,16 +695,20 @@ def registrar_interacao(
     score = int(score_map.get(interacao.tipo_interacao.lower(), 3) * interacao.peso)
     score = max(1, min(5, score))  # Garantir entre 1-5
     
-    # Verificar se já existe interação
-    existing = db.query(RecomendacaoEstabelecimento).filter(
+    # Verificar se já existe interação (usando select para evitar colunas que não existem)
+    from sqlalchemy import select, update
+    stmt = select(RecomendacaoEstabelecimento.id).filter(
         RecomendacaoEstabelecimento.id_usuario == interacao.usuario_id,
         RecomendacaoEstabelecimento.id_lugar == interacao.estabelecimento_id
-    ).first()
+    )
+    result = db.execute(stmt).first()
     
-    if existing:
-        # Atualizar score existente
-        existing.score = score
-        existing.updated_at = datetime.utcnow()
+    if result:
+        # Atualizar score existente usando update direto
+        stmt_update = update(RecomendacaoEstabelecimento).where(
+            RecomendacaoEstabelecimento.id == result.id
+        ).values(score=score)
+        db.execute(stmt_update)
     else:
         # Criar nova interação
         nova_interacao = RecomendacaoEstabelecimento(
@@ -502,26 +745,31 @@ def treinar_modelo(
     """
     try:
         if request.algoritmo.lower() == "lightfm":
-            # Tentar treinar via VENV primeiro
+            # Tentar treinar via VENV primeiro, se disponível
             if LIGHTFM_AVAILABLE and lightfm_service is not None:
-                # Treinar LightFM via VENV
-                metrics = lightfm_service.train(
-                    db=db,
-                    loss=request.loss,
-                    use_features=request.usar_features,
-                    num_epochs=request.num_epochs or 30,
-                    learning_rate=request.learning_rate or 0.05,
-                    num_components=request.num_components or 30
-                )
-                
-                # Salvar modelo
-                lightfm_service.save_model()
-                
-                return {
-                    "message": "Modelo LightFM treinado com sucesso (via VENV)",
-                    "algoritmo": "lightfm",
-                    "metricas": metrics
-                }
+                try:
+                    # Treinar LightFM via VENV
+                    metrics = lightfm_service.train(
+                        db=db,
+                        loss=request.loss,
+                        use_features=request.usar_features,
+                        num_epochs=request.num_epochs or 30,
+                        learning_rate=request.learning_rate or 0.05,
+                        num_components=request.num_components or 30
+                    )
+                    
+                    # Salvar modelo
+                    lightfm_service.save_model()
+                    
+                    return {
+                        "message": "Modelo LightFM treinado com sucesso (via VENV)",
+                        "algoritmo": "lightfm",
+                        "metricas": metrics
+                    }
+                except Exception as e:
+                    # Se houver erro no venv, tentar Conda
+                    print(f"⚠️  Erro ao treinar LightFM no venv: {e}. Tentando via Conda...")
+                    return train_lightfm_via_conda(request)
             else:
                 # Treinar via Conda quando não disponível no VENV
                 print("ℹ️  LightFM não disponível no VENV, treinando via Conda...")
@@ -574,7 +822,7 @@ def cold_start_usuario(
     - LightFM: Usa apenas CBF baseado nas preferências declaradas
     - Surprise: Retorna itens mais populares
     """
-    usuario = db.query(Usuarios).filter(Usuarios.id == usuario_id).first()
+    usuario = get_usuario_by_id(db, usuario_id)
     if not usuario:
         raise HTTPException(status_code=404, detail=f"Usuário {usuario_id} não encontrado")
     
@@ -601,9 +849,7 @@ def cold_start_usuario(
         
         recomendacoes = []
         for estabelecimento_id, score in predictions:
-            estabelecimento = db.query(Estabelecimentos).filter(
-                Estabelecimentos.id == estabelecimento_id
-            ).first()
+            estabelecimento = get_estabelecimento_by_id(db, estabelecimento_id)
             
             recomendacoes.append({
                 "estabelecimento_id": estabelecimento_id,
@@ -632,9 +878,7 @@ def cold_start_estabelecimento(
     
     Retorna quais metadados estão faltando para melhor performance
     """
-    estabelecimento = db.query(Estabelecimentos).filter(
-        Estabelecimentos.id == estabelecimento_id
-    ).first()
+    estabelecimento = get_estabelecimento_by_id(db, estabelecimento_id)
     
     if not estabelecimento:
         raise HTTPException(
@@ -683,7 +927,7 @@ def get_recomendacoes_diversas(
     
     Usa estratégia epsilon-greedy para balancear relevância e diversidade
     """
-    usuario = db.query(Usuarios).filter(Usuarios.id == usuario_id).first()
+    usuario = get_usuario_by_id(db, usuario_id)
     if not usuario:
         raise HTTPException(status_code=404, detail=f"Usuário {usuario_id} não encontrado")
     
@@ -718,9 +962,7 @@ def get_recomendacoes_diversas(
         
         recomendacoes = []
         for estabelecimento_id, score in predictions:
-            estabelecimento = db.query(Estabelecimentos).filter(
-                Estabelecimentos.id == estabelecimento_id
-            ).first()
+            estabelecimento = get_estabelecimento_by_id(db, estabelecimento_id)
             
             recomendacoes.append({
                 "estabelecimento_id": estabelecimento_id,
@@ -760,7 +1002,7 @@ def get_recomendacoes_contextuais(
     - Horários de pico
     - Padrões por dia da semana
     """
-    usuario = db.query(Usuarios).filter(Usuarios.id == usuario_id).first()
+    usuario = get_usuario_by_id(db, usuario_id)
     if not usuario:
         raise HTTPException(status_code=404, detail=f"Usuário {usuario_id} não encontrado")
     
@@ -786,9 +1028,7 @@ def get_recomendacoes_contextuais(
         
         recomendacoes_contextuais = []
         for estabelecimento_id, score in predictions:
-            estabelecimento = db.query(Estabelecimentos).filter(
-                Estabelecimentos.id == estabelecimento_id
-            ).first()
+            estabelecimento = get_estabelecimento_by_id(db, estabelecimento_id)
             
             if not estabelecimento:
                 continue
@@ -843,7 +1083,7 @@ def comparar_algoritmos(
     """
     Compara recomendações de LightFM e Surprise para o mesmo usuário
     """
-    usuario = db.query(Usuarios).filter(Usuarios.id == usuario_id).first()
+    usuario = get_usuario_by_id(db, usuario_id)
     if not usuario:
         raise HTTPException(status_code=404, detail=f"Usuário {usuario_id} não encontrado")
     

@@ -58,20 +58,28 @@ class LightFMService:
         Returns:
             (user_ids, item_ids, ratings): Arrays numpy com interações
         """
-        # Buscar todas as interações
-        interactions = db.query(RecomendacaoEstabelecimento).all()
+        # Selecionar apenas colunas que existem (sem created_at e updated_at)
+        from sqlalchemy import select
+        stmt = select(
+            RecomendacaoEstabelecimento.id_usuario,
+            RecomendacaoEstabelecimento.id_lugar,
+            RecomendacaoEstabelecimento.score
+        )
         
-        if not interactions:
+        result = db.execute(stmt)
+        rows = result.all()
+        
+        if not rows:
             return np.array([]), np.array([]), np.array([])
         
         user_ids = []
         item_ids = []
         ratings = []
         
-        for interaction in interactions:
-            user_ids.append(interaction.id_usuario)
-            item_ids.append(interaction.id_lugar)
-            ratings.append(float(interaction.score))
+        for row in rows:
+            user_ids.append(row.id_usuario)
+            item_ids.append(row.id_lugar)
+            ratings.append(float(row.score))
         
         return np.array(user_ids), np.array(item_ids), np.array(ratings)
     
@@ -82,14 +90,22 @@ class LightFMService:
         Returns:
             Dict mapping user_id -> [(feature_id, weight), ...]
         """
-        # Buscar preferências de usuários
-        user_prefs = db.query(UsuarioPreferencia).all()
+        # Selecionar apenas colunas que existem (sem id, created_at e updated_at)
+        from sqlalchemy import select
+        stmt = select(
+            UsuarioPreferencia.id_usuario,
+            UsuarioPreferencia.id_preferencia,
+            UsuarioPreferencia.peso
+        )
+        
+        result = db.execute(stmt)
+        rows = result.all()
         
         features_map = {}
-        for up in user_prefs:
-            if up.id_usuario not in features_map:
-                features_map[up.id_usuario] = []
-            features_map[up.id_usuario].append((up.id_preferencia, float(up.peso)))
+        for row in rows:
+            if row.id_usuario not in features_map:
+                features_map[row.id_usuario] = []
+            features_map[row.id_usuario].append((row.id_preferencia, float(row.peso)))
         
         return features_map
     
@@ -100,14 +116,22 @@ class LightFMService:
         Returns:
             Dict mapping item_id -> [(feature_id, weight), ...]
         """
-        # Buscar preferências de estabelecimentos
-        item_prefs = db.query(EstabelecimentoPreferencia).all()
+        # Selecionar apenas colunas que existem (sem id, created_at e updated_at)
+        from sqlalchemy import select
+        stmt = select(
+            EstabelecimentoPreferencia.id_estabelecimento,
+            EstabelecimentoPreferencia.id_preferencia,
+            EstabelecimentoPreferencia.peso
+        )
+        
+        result = db.execute(stmt)
+        rows = result.all()
         
         features_map = {}
-        for ep in item_prefs:
-            if ep.id_estabelecimento not in features_map:
-                features_map[ep.id_estabelecimento] = []
-            features_map[ep.id_estabelecimento].append((ep.id_preferencia, float(ep.peso)))
+        for row in rows:
+            if row.id_estabelecimento not in features_map:
+                features_map[row.id_estabelecimento] = []
+            features_map[row.id_estabelecimento].append((row.id_preferencia, float(row.peso)))
         
         return features_map
     
@@ -151,8 +175,10 @@ class LightFMService:
             user_features_map = self._load_user_features(db)
             item_features_map = self._load_item_features(db)
             
-            # Obter todas as preferências únicas
-            all_prefs = db.query(Preferencias).all()
+            # Obter todas as preferências únicas (usando select para evitar colunas que não existem)
+            stmt_prefs = select(Preferencias.id)
+            prefs_result = db.execute(stmt_prefs)
+            all_prefs = prefs_result.all()
             feature_names = [f"pref_{p.id}" for p in all_prefs]
             
             # Adicionar features ao dataset
@@ -346,7 +372,9 @@ class LightFMService:
             user_features_map = self._load_user_features(db)
             if user_id in user_features_map:
                 # Construir features para este usuário específico
-                all_prefs = db.query(Preferencias).all()
+                stmt_prefs = select(Preferencias.id)
+                prefs_result = db.execute(stmt_prefs)
+                all_prefs = prefs_result.all()
                 feature_names = [f"pref_{p.id}" for p in all_prefs]
                 user_feats = [f"pref_{feat_id}" for feat_id, _ in user_features_map[user_id]]
                 # Nota: Esta é uma simplificação - em produção, construir matriz completa
@@ -390,12 +418,16 @@ class LightFMService:
         Predição para cold start (usuário novo sem interações)
         Usa apenas features (CBF)
         """
-        # Carregar preferências do usuário
-        user_prefs = db.query(UsuarioPreferencia).filter(
-            UsuarioPreferencia.id_usuario == user_id
-        ).all()
+        # Carregar preferências do usuário (usando select para evitar colunas que não existem)
+        from sqlalchemy import select
+        stmt = select(
+            UsuarioPreferencia.id_preferencia
+        ).filter(UsuarioPreferencia.id_usuario == user_id)
         
-        if not user_prefs:
+        result = db.execute(stmt)
+        user_prefs_rows = result.all()
+        
+        if not user_prefs_rows:
             # Sem preferências - retornar itens populares
             popular_items = db.query(
                 RecomendacaoEstabelecimento.id_lugar,
@@ -409,24 +441,36 @@ class LightFMService:
             return [(item.id_lugar, float(item.avg_score)) for item in popular_items]
         
         # Buscar estabelecimentos com features similares
-        user_pref_ids = {up.id_preferencia for up in user_prefs}
+        user_pref_ids = {row.id_preferencia for row in user_prefs_rows}
         
         # Buscar estabelecimentos que têm essas preferências
-        matching_items = db.query(EstabelecimentoPreferencia.id_estabelecimento).filter(
+        stmt_matching = select(
+            EstabelecimentoPreferencia.id_estabelecimento
+        ).filter(
             EstabelecimentoPreferencia.id_preferencia.in_(user_pref_ids)
-        ).distinct().all()
+        ).distinct()
+        
+        matching_result = db.execute(stmt_matching)
+        matching_items = matching_result.all()
         
         if not matching_items:
             return []
         
         # Calcular scores baseados em similaridade de features
         results = []
-        for item_id, in matching_items:
-            item_prefs = db.query(EstabelecimentoPreferencia).filter(
-                EstabelecimentoPreferencia.id_estabelecimento == item_id
-            ).all()
+        for row in matching_items:
+            item_id = row.id_estabelecimento
             
-            item_pref_ids = {ip.id_preferencia for ip in item_prefs}
+            # Buscar preferências do estabelecimento
+            stmt_item = select(
+                EstabelecimentoPreferencia.id_preferencia
+            ).filter(
+                EstabelecimentoPreferencia.id_estabelecimento == item_id
+            )
+            
+            item_result = db.execute(stmt_item)
+            item_prefs_rows = item_result.all()
+            item_pref_ids = {row.id_preferencia for row in item_prefs_rows}
             
             # Calcular interseção de preferências
             common_prefs = user_pref_ids.intersection(item_pref_ids)
