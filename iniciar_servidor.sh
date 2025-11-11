@@ -5,7 +5,7 @@
 # Este script detecta automaticamente o caminho do Conda e configura
 # o ambiente necessário para executar o sistema de recomendação
 
-# Obter diretório do script
+# Obter diretório do script (raiz do projeto)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
@@ -54,6 +54,9 @@ if [ ! -f ".env" ]; then
     echo "   Crie um arquivo .env com DATABASE_URL e outras configurações."
     echo "   Veja INSTALACAO.md para mais detalhes."
 fi
+
+# Mudar para o diretório backend
+cd backend
 
 # Iniciar servidor
 echo ""

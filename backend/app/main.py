@@ -1,6 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import usuarios, estabelecimentos, preferencias, recomendacoes
+from app.api import (
+    usuarios,
+    estabelecimentos,
+    preferencias,
+    recomendacoes,
+    universidades,
+    categorias_estabelecimentos,
+    usuario_preferencia,
+    estabelecimento_preferencia,
+    recomendacao_usuario
+)
 
 app = FastAPI(
     title="Sistema de Recomendação - LightFM & Surprise",
@@ -53,6 +63,11 @@ app.add_middleware(
 app.include_router(usuarios.router)
 app.include_router(estabelecimentos.router)
 app.include_router(preferencias.router)
+app.include_router(universidades.router)
+app.include_router(categorias_estabelecimentos.router)
+app.include_router(usuario_preferencia.router)
+app.include_router(estabelecimento_preferencia.router)
+app.include_router(recomendacao_usuario.router)
 app.include_router(recomendacoes.router)
 
 
@@ -72,10 +87,48 @@ def root():
 @app.get("/health", tags=["Health"])
 def health_check():
     """
-    Verificar saúde da API
+    Verificar saúde da API, banco de dados e modelos
     """
-    return {
+    from app.core.database import SessionLocal, engine
+    from pathlib import Path
+    import os
+    
+    health_status = {
         "status": "healthy",
-        "database": "not_configured",  # TODO: verificar conexão com DB
-        "modelo": "not_trained"  # TODO: verificar status do modelo
+        "api": "online",
+        "database": "unknown",
+        "models": {
+            "lightfm": "unknown",
+            "surprise": "unknown"
+        }
     }
+    
+    # Verificar conexão com banco de dados
+    try:
+        from sqlalchemy import text
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+        health_status["database"] = "connected"
+    except Exception as e:
+        health_status["database"] = f"error: {str(e)}"
+        health_status["status"] = "degraded"
+    
+    # Verificar modelos
+    models_dir = Path(__file__).parent.parent / "models"
+    
+    # LightFM
+    lightfm_path = models_dir / "lightfm_model.pkl"
+    if lightfm_path.exists():
+        health_status["models"]["lightfm"] = "trained"
+    else:
+        health_status["models"]["lightfm"] = "not_trained"
+    
+    # Surprise
+    surprise_path = models_dir / "surprise_model.pkl"
+    if surprise_path.exists():
+        health_status["models"]["surprise"] = "trained"
+    else:
+        health_status["models"]["surprise"] = "not_trained"
+    
+    return health_status
