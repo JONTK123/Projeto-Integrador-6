@@ -17,5 +17,6 @@ class RecomendacaoEstabelecimento(Base):
     id_lugar = Column(Integer, ForeignKey("estabelecimentos.id_estabelecimento"), nullable=False)
     score = Column(Integer, nullable=False)  # Avaliação/Peso da interação (1-5)
     data_recomendacao = Column(Date, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # created_at e updated_at não existem na tabela do banco
+    # created_at = Column(DateTime, default=datetime.utcnow)
+    # updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -12,5 +12,6 @@ class CategoriasEstabelecimentos(Base):
 
     id = Column(Integer, primary_key=True, index=True, name="id_categoria")
     nome_categoria = Column(String(100), nullable=False, unique=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # created_at e updated_at não existem na tabela do banco
+    # created_at = Column(DateTime, default=datetime.utcnow)
+    # updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

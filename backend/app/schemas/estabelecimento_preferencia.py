@@ -31,7 +31,8 @@ class EstabelecimentoPreferenciaResponse(EstabelecimentoPreferenciaBase):
     Schema de resposta para associação Estabelecimento-Preferencia
     """
     id: int
-    created_at: datetime
-    updated_at: datetime
+    # created_at e updated_at não existem na tabela do banco
+    # created_at: Optional[datetime] = None
+    # updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

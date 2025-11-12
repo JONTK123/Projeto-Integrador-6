@@ -67,8 +67,14 @@ def list_usuarios(
     """
     Listar todos os usuários com paginação
     """
-    usuarios = db.query(Usuarios).offset(skip).limit(limit).all()
-    return usuarios
+    try:
+        usuarios = db.query(Usuarios).offset(skip).limit(limit).all()
+        return usuarios
+    except Exception as e:
+        import traceback
+        print(f"Erro ao listar usuários: {e}")
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Erro ao listar usuários: {str(e)}")
 
 
 @router.get("/{usuario_id}", response_model=UsuariosResponse)
@@ -131,7 +137,8 @@ def update_usuario(
     for field, value in update_data.items():
         setattr(db_usuario, field, value)
     
-    db_usuario.updated_at = datetime.utcnow()
+    # updated_at não existe na tabela do banco
+    # db_usuario.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_usuario)
     

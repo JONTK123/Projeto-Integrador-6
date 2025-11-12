@@ -43,7 +43,18 @@ else:
     print("⚠️  LightFM não está disponível no ambiente principal (venv)")
     print("   O modelo será treinado/usado via Conda quando necessário")
 
-surprise_service = SurpriseService()
+# Inicializar SurpriseService com o diretório correto
+backend_models_path = Path(__file__).parent.parent.parent / "models"
+surprise_service = SurpriseService(model_dir=str(backend_models_path))
+
+# Tentar carregar modelo Surprise se existir
+try:
+    surprise_service.load_model()
+    print("✅ Surprise: Modelo carregado com sucesso!")
+except FileNotFoundError:
+    print("ℹ️  Surprise: Modelo ainda não foi treinado")
+except Exception as e:
+    print(f"⚠️  Surprise: Erro ao carregar modelo: {e}")
 
 # Função auxiliar para buscar usuário sem colunas que não existem
 def get_usuario_by_id(db: Session, usuario_id: int):
@@ -543,6 +554,12 @@ def get_recomendacoes_usuario(
             algo_name = "lightfm"
         elif algoritmo.lower() == "surprise":
             # Usar Surprise
+            # Verificar se o modelo está treinado
+            if surprise_service.model is None or surprise_service.trainset is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Modelo Surprise não está treinado. Por favor, treine o modelo primeiro através da página de Treinamento ou via API POST /recomendacoes/treinar com algoritmo='surprise'"
+                )
             predictions = surprise_service.predict(
                 user_id=usuario_id,
                 num_items=top_n,
@@ -780,6 +797,10 @@ def treinar_modelo(
             # Filtrar parâmetros, removendo os que não são do Surprise
             kwargs = {k: v for k, v in request.dict().items() 
                      if k not in ['algoritmo', 'usar_features', 'loss', 'algorithm'] and v is not None}
+            
+            # Converter num_epochs para n_epochs (Surprise usa n_epochs)
+            if 'num_epochs' in kwargs:
+                kwargs['n_epochs'] = kwargs.pop('num_epochs')
             
             metrics = surprise_service.train(
                 db=db,

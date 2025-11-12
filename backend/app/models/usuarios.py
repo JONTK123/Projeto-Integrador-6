@@ -20,5 +20,6 @@ class Usuarios(Base):
     descricao = Column(Text)
     id_universidade = Column(Integer, ForeignKey("universidades.id_universidade"))
     data_cadastro = Column(Date, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # created_at e updated_at não existem na tabela do banco
+    # created_at = Column(DateTime, default=datetime.utcnow)
+    # updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -14,7 +14,7 @@ export default function Treinamento() {
         algoritmo,
         loss: 'warp',
         usar_features: true,
-        algorithm: 'SVD',
+        algorithm: 'svd',
         num_epochs: 30,
       };
       const res = await treinarModelo(data);

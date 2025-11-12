@@ -24,6 +24,7 @@ build/
 
 # Models
 models/*.pkl
+backend/models/*.pkl
 test_models/
 
 # Database

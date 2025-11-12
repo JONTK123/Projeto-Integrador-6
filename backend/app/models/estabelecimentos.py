@@ -19,5 +19,6 @@ class Estabelecimentos(Base):
     dono_nome = Column(String(255))
     dono_email = Column(String(255))
     id_categoria = Column(Integer, ForeignKey("categorias_estabelecimentos.id_categoria"))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # created_at e updated_at não existem na tabela do banco
+    # created_at = Column(DateTime, default=datetime.utcnow)
+    # updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -40,8 +40,9 @@ class UsuariosResponse(UsuariosBase):
     Schema de resposta para Usuário
     """
     id: int
-    data_cadastro: date
-    created_at: datetime
-    updated_at: datetime
+    data_cadastro: Optional[date] = None
+    # created_at e updated_at não existem na tabela do banco
+    # created_at: Optional[datetime] = None
+    # updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

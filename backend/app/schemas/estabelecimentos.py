@@ -41,7 +41,8 @@ class EstabelecimentosResponse(EstabelecimentosBase):
     Schema de resposta para Estabelecimento
     """
     id: int
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
+    # created_at e updated_at não existem na tabela do banco
+    # created_at: Optional[datetime] = None
+    # updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)

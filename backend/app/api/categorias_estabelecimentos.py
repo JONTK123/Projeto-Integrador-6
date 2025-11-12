@@ -108,7 +108,8 @@ def update_categoria(
     for field, value in update_data.items():
         setattr(db_categoria, field, value)
     
-    db_categoria.updated_at = datetime.utcnow()
+    # updated_at não existe na tabela do banco
+    # db_categoria.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_categoria)
     

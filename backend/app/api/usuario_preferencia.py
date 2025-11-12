@@ -131,7 +131,8 @@ def update_usuario_preferencia(
     if usuario_preferencia.peso is not None:
         db_associacao.peso = usuario_preferencia.peso
     
-    db_associacao.updated_at = datetime.utcnow()
+    # updated_at não existe na tabela do banco
+    # db_associacao.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_associacao)
     

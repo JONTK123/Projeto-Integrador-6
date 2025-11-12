@@ -147,7 +147,8 @@ def update_recomendacao_usuario(
     if recomendacao.score is not None:
         db_recomendacao.score = recomendacao.score
     
-    db_recomendacao.updated_at = datetime.utcnow()
+    # updated_at não existe na tabela do banco
+    # db_recomendacao.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_recomendacao)
     

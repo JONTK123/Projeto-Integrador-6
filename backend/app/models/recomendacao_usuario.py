@@ -17,5 +17,6 @@ class RecomendacaoUsuario(Base):
     id_usuario2 = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False)
     score = Column(Float, nullable=False)  # Similaridade entre usuários (0-1)
     data_recomendacao = Column(Date, default=datetime.utcnow)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # created_at e updated_at não existem na tabela do banco
+    # created_at = Column(DateTime, default=datetime.utcnow)
+    # updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

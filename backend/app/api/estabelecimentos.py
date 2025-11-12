@@ -115,7 +115,8 @@ def update_estabelecimento(
     for field, value in update_data.items():
         setattr(db_estabelecimento, field, value)
     
-    db_estabelecimento.updated_at = datetime.utcnow()
+    # updated_at não existe na tabela do banco
+    # db_estabelecimento.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_estabelecimento)
     

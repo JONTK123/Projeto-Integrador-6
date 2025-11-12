@@ -80,7 +80,8 @@ def update_preferencia(
     for field, value in update_data.items():
         setattr(db_preferencia, field, value)
     
-    db_preferencia.updated_at = datetime.utcnow()
+    # updated_at não existe na tabela do banco
+    # db_preferencia.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_preferencia)
     

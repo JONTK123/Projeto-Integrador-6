@@ -16,5 +16,6 @@ class UsuarioPreferencia(Base):
     id_usuario = Column(Integer, ForeignKey("usuarios.id_usuario"), nullable=False)
     id_preferencia = Column(Integer, ForeignKey("preferencias.id_preferencia"), nullable=False)
     peso = Column(Float, default=1.0)  # Importância da preferência para o usuário (1-5)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # created_at e updated_at não existem na tabela do banco
+    # created_at = Column(DateTime, default=datetime.utcnow)
+    # updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

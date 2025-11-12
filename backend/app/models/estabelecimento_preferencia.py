@@ -16,5 +16,6 @@ class EstabelecimentoPreferencia(Base):
     id_estabelecimento = Column(Integer, ForeignKey("estabelecimentos.id_estabelecimento"), nullable=False)
     id_preferencia = Column(Integer, ForeignKey("preferencias.id_preferencia"), nullable=False)
     peso = Column(Float, default=1.0)  # Intensidade da característica (1-5)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # created_at e updated_at não existem na tabela do banco
+    # created_at = Column(DateTime, default=datetime.utcnow)
+    # updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

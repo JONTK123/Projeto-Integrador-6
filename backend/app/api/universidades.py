@@ -84,7 +84,8 @@ def update_universidade(
     for field, value in update_data.items():
         setattr(db_universidade, field, value)
     
-    db_universidade.updated_at = datetime.utcnow()
+    # updated_at não existe na tabela do banco
+    # db_universidade.updated_at = datetime.utcnow()
     db.commit()
     db.refresh(db_universidade)
     
