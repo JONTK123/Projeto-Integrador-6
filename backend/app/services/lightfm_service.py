@@ -154,10 +154,23 @@ class LightFMService:
         unique_items = np.unique(item_ids)
         
         # Criar mapeamentos bidirecionais
-        self.user_id_map = {db_id: idx for idx, db_id in enumerate(unique_users)}
-        self.item_id_map = {db_id: idx for idx, db_id in enumerate(unique_items)}
-        self.reverse_user_map = {idx: db_id for db_id, idx in self.user_id_map.items()}
-        self.reverse_item_map = {idx: db_id for db_id, idx in self.item_id_map.items()}
+        # Converter valores NumPy para tipos Python nativos
+        self.user_id_map = {
+            int(db_id.item() if hasattr(db_id, 'item') else db_id): idx 
+            for idx, db_id in enumerate(unique_users)
+        }
+        self.item_id_map = {
+            int(db_id.item() if hasattr(db_id, 'item') else db_id): idx 
+            for idx, db_id in enumerate(unique_items)
+        }
+        self.reverse_user_map = {
+            idx: int(db_id.item() if hasattr(db_id, 'item') else db_id) 
+            for db_id, idx in self.user_id_map.items()
+        }
+        self.reverse_item_map = {
+            idx: int(db_id.item() if hasattr(db_id, 'item') else db_id) 
+            for db_id, idx in self.item_id_map.items()
+        }
         
         # Converter IDs para índices do LightFM
         user_indices = np.array([self.user_id_map[uid] for uid in user_ids])
@@ -288,49 +301,54 @@ class LightFMService:
         )
         
         # Avaliar
-        train_precision = precision_at_k(
-            self.model,
-            train,
-            user_features=user_features,
-            item_features=item_features,
-            k=10,
-            num_threads=num_threads
-        ).mean()
-        
-        test_precision = precision_at_k(
-            self.model,
-            test,
-            train_interactions=train,
-            user_features=user_features,
-            item_features=item_features,
-            k=10,
-            num_threads=num_threads
-        ).mean()
-        
-        train_auc = auc_score(
-            self.model,
-            train,
-            user_features=user_features,
-            item_features=item_features,
-            num_threads=num_threads
-        ).mean()
-        
-        test_auc = auc_score(
-            self.model,
-            test,
-            train_interactions=train,
-            user_features=user_features,
-            item_features=item_features,
-            num_threads=num_threads
-        ).mean()
-        
-        metrics = {
-            "train_precision@10": float(train_precision),
-            "test_precision@10": float(test_precision),
-            "train_auc": float(train_auc),
-            "test_auc": float(test_auc)
-        }
-        
+        metrics = {}
+        try:
+            train_precision = precision_at_k(
+                self.model,
+                train,
+                user_features=user_features,
+                item_features=item_features,
+                k=10,
+                num_threads=num_threads
+            ).mean()
+            
+            test_precision = precision_at_k(
+                self.model,
+                test,
+                train_interactions=train,
+                user_features=user_features,
+                item_features=item_features,
+                k=10,
+                num_threads=num_threads
+            ).mean()
+            
+            train_auc = auc_score(
+                self.model,
+                train,
+                user_features=user_features,
+                item_features=item_features,
+                num_threads=num_threads
+            ).mean()
+            
+            test_auc = auc_score(
+                self.model,
+                test,
+                train_interactions=train,
+                user_features=user_features,
+                item_features=item_features,
+                num_threads=num_threads
+            ).mean()
+            
+            metrics = {
+                "train_precision@10": float(train_precision),
+                "test_precision@10": float(test_precision),
+                "train_auc": float(train_auc),
+                "test_auc": float(test_auc)
+            }
+        except ValueError as e:
+            print(f"Aviso durante a avaliação: {e}")
+            metrics = {"evaluation_warning": str(e)}
+
         return metrics
     
     def predict(
@@ -399,10 +417,13 @@ class LightFMService:
         )
         
         # Mapear de volta para IDs do banco
-        results = [
-            (int(self.reverse_item_map[idx]), float(score))
-            for idx, score in zip(item_indices, scores)
-        ]
+        results = []
+        for idx, score in zip(item_indices, scores):
+            idx_int = int(idx.item() if hasattr(idx, 'item') else idx)
+            item_id = self.reverse_item_map[idx_int]
+            item_id_int = int(item_id.item() if hasattr(item_id, 'item') else item_id)
+            score_float = float(score.item() if hasattr(score, 'item') else score)
+            results.append((item_id_int, score_float))
         
         # Ordenar por score e retornar top N
         results.sort(key=lambda x: x[1], reverse=True)
@@ -481,6 +502,66 @@ class LightFMService:
         results.sort(key=lambda x: x[1], reverse=True)
         return results[:num_items]
     
+    def get_similar_users(
+        self,
+        user_id: int,
+        num_users: int = 10
+    ) -> List[Tuple[int, float]]:
+        """
+        Encontra usuários similares (user-user similarity)
+        
+        Args:
+            user_id: ID do usuário no banco de dados
+            num_users: Número de usuários similares a retornar
+            
+        Returns:
+            Lista de tuplas (user_id, similarity_score)
+        """
+        if self.model is None:
+            raise ValueError("Modelo não treinado")
+        
+        if user_id not in self.user_id_map:
+            raise ValueError(f"Usuário {user_id} não encontrado no modelo")
+        
+        user_idx = self.user_id_map[user_id]
+        # Garantir que user_idx é int Python nativo
+        user_idx = int(user_idx.item() if hasattr(user_idx, 'item') else user_idx)
+        
+        # Obter embeddings de usuários
+        user_biases, user_embeddings = self.model.get_user_representations()
+        
+        # Normalizar embeddings para cálculo de similaridade de cosseno
+        user_embeddings = user_embeddings / np.linalg.norm(user_embeddings, axis=1, keepdims=True)
+        
+        # Embedding do usuário de referência
+        target_embedding = user_embeddings[user_idx]
+        
+        # Calcular similaridade de cosseno com todos os outros usuários
+        similarities = np.dot(user_embeddings, target_embedding)
+        
+        # Remover o próprio usuário
+        similarities[user_idx] = -np.inf
+        
+        # Obter top N
+        top_indices = np.argsort(similarities)[::-1][:num_users]
+        
+        results = []
+        for idx in top_indices:
+            # Converter idx para int Python nativo
+            idx_int = int(idx.item() if hasattr(idx, 'item') else idx)
+            # Verificar se o índice existe no mapeamento
+            if idx_int not in self.reverse_user_map:
+                continue  # Pular índices que não existem no mapeamento
+            # Obter user_id e converter para int Python nativo
+            user_id = self.reverse_user_map[idx_int]
+            user_id_int = int(user_id.item() if hasattr(user_id, 'item') else user_id)
+            # Obter score e converter para float Python nativo
+            score = similarities[idx_int]
+            score_float = float(score.item() if hasattr(score, 'item') else score)
+            results.append((user_id_int, score_float))
+        
+        return results
+
     def get_similar_items(
         self,
         item_id: int,
@@ -518,10 +599,17 @@ class LightFMService:
         # Obter top N
         top_indices = np.argsort(similarities)[::-1][:num_items]
         
-        results = [
-            (self.reverse_item_map[idx], float(similarities[idx]))
-            for idx in top_indices
-        ]
+        results = []
+        for idx in top_indices:
+            # Converter idx para int Python nativo
+            idx_int = int(idx.item() if hasattr(idx, 'item') else idx)
+            # Obter item_id e converter para int Python nativo
+            item_id = self.reverse_item_map[idx_int]
+            item_id_int = int(item_id.item() if hasattr(item_id, 'item') else item_id)
+            # Obter score e converter para float Python nativo
+            score = similarities[idx_int]
+            score_float = float(score.item() if hasattr(score, 'item') else score)
+            results.append((item_id_int, score_float))
         
         return results
     
@@ -548,7 +636,19 @@ class LightFMService:
             raise FileNotFoundError(f"Modelo não encontrado: {model_path}")
         
         try:
-            data = joblib.load(model_path)
+            # Tentar carregar com tratamento de compatibilidade NumPy
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', category=UserWarning)
+                # Usar pickle_load_compat para lidar com incompatibilidades de versão
+                try:
+                    data = joblib.load(model_path)
+                except (ValueError, AttributeError) as e:
+                    # Se houver erro de compatibilidade NumPy, tentar com pickle diretamente
+                    import pickle
+                    with open(model_path, 'rb') as f:
+                        data = pickle.load(f)
+            
             self.model = data['model']
             self.dataset = data['dataset']
             self.user_id_map = data['user_id_map']
@@ -556,7 +656,15 @@ class LightFMService:
             self.reverse_user_map = data['reverse_user_map']
             self.reverse_item_map = data['reverse_item_map']
         except Exception as e:
-            raise ValueError(f"Erro ao carregar modelo: {e}")
+            error_msg = str(e)
+            if "BitGenerator" in error_msg or "MT19937" in error_msg:
+                raise ValueError(
+                    f"Erro de compatibilidade NumPy ao carregar modelo. "
+                    f"O modelo foi salvo com uma versão diferente do NumPy. "
+                    f"Recomendação: Retreine o modelo com a versão atual do NumPy. "
+                    f"Erro original: {error_msg}"
+                )
+            raise ValueError(f"Erro ao carregar modelo: {error_msg}")
     
     def is_model_loaded(self) -> bool:
         """Verifica se o modelo está carregado"""

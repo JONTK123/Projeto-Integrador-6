@@ -4,6 +4,29 @@
 # 
 # Este script detecta automaticamente o caminho do Conda e configura
 # o ambiente necessário para executar o sistema de recomendação
+#
+# ============================================================================
+# CONFIGURAÇÃO MANUAL DO CONDA (se necessário):
+# ============================================================================
+# Se o script não detectar o Conda automaticamente, você pode configurá-lo
+# manualmente executando os seguintes comandos:
+#
+# 1. Criar ambiente Conda com Python 3.11:
+#    conda create -n lightfm_py311 python=3.11 -y
+#    conda activate lightfm_py311
+#
+# 2. Instalar pacotes científicos via Conda (recomendado):
+#    conda install -y numpy scipy scikit-learn pandas -c conda-forge
+#
+# 3. Instalar LightFM e dependências do projeto:
+#    pip install lightfm fastapi sqlalchemy pydantic python-dotenv psycopg2-binary joblib
+#
+# 4. Desativar ambiente:
+#    conda deactivate
+#
+# O script tentará criar o ambiente automaticamente se não existir, mas
+# a instalação manual garante melhor controle sobre as versões dos pacotes.
+# ============================================================================
 
 # Obter diretório do script (raiz do projeto)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -19,17 +42,26 @@ if command -v conda &> /dev/null; then
             echo "✅ Conda detectado: $CONDA_PYTHON_PATH"
         else
             echo "⚠️  Ambiente Conda 'lightfm_py311' não encontrado em $CONDA_PYTHON_PATH"
-            echo "   Criando ambiente..."
+            echo "   Criando ambiente automaticamente..."
+            echo "   (Para configuração manual, veja os comentários no início do script)"
             conda create -n lightfm_py311 python=3.11 -y
-            conda run -n lightfm_py311 pip install lightfm numpy scipy scikit-learn fastapi sqlalchemy pydantic python-dotenv psycopg2-binary pandas joblib
+            # Instalar pacotes científicos via Conda (recomendado para melhor performance)
+            conda install -n lightfm_py311 -y numpy scipy scikit-learn pandas -c conda-forge
+            # Instalar LightFM e dependências do projeto via pip
+            conda run -n lightfm_py311 pip install lightfm fastapi sqlalchemy pydantic python-dotenv psycopg2-binary joblib
             CONDA_PYTHON_PATH="$CONDA_BASE/envs/lightfm_py311/bin/python3.11"
             export CONDA_PYTHON_PATH
+            echo "✅ Ambiente Conda 'lightfm_py311' criado com sucesso!"
         fi
     else
         echo "⚠️  Conda não encontrado. LightFM pode não funcionar."
+        echo "   Para instalar Conda, visite: https://docs.conda.io/en/latest/miniconda.html"
+        echo "   Após instalar, configure o ambiente seguindo as instruções no início deste script."
     fi
 else
     echo "⚠️  Conda não está instalado. Instale Conda para usar LightFM."
+    echo "   Para instalar Conda, visite: https://docs.conda.io/en/latest/miniconda.html"
+    echo "   Após instalar, configure o ambiente seguindo as instruções no início deste script."
 fi
 
 # Verificar se venv existe
