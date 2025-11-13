@@ -1,21 +1,3 @@
-fastapi
-uvicorn[standard]
-sqlalchemy
-pydantic
-pydantic-settings
-pydantic[email]
-python-dotenv
-psycopg2-binary
-alembic
-lightfm
-scikit-surprise
-numpy<2
-scipy
-joblib
-pandas
-requests
-email-validator
-
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
 sqlalchemy==2.0.23
@@ -29,5 +11,9 @@ git+https://github.com/lyst/lightfm.git@master
 numpy
 scipy
 scikit-learn
+scikit-surprise
 joblib
+pandas
+requests
+email-validator
 

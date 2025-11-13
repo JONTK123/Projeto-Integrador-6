@@ -636,7 +636,19 @@ class LightFMService:
             raise FileNotFoundError(f"Modelo não encontrado: {model_path}")
         
         try:
-            data = joblib.load(model_path)
+            # Tentar carregar com tratamento de compatibilidade NumPy
+            import warnings
+            with warnings.catch_warnings():
+                warnings.filterwarnings('ignore', category=UserWarning)
+                # Usar pickle_load_compat para lidar com incompatibilidades de versão
+                try:
+                    data = joblib.load(model_path)
+                except (ValueError, AttributeError) as e:
+                    # Se houver erro de compatibilidade NumPy, tentar com pickle diretamente
+                    import pickle
+                    with open(model_path, 'rb') as f:
+                        data = pickle.load(f)
+            
             self.model = data['model']
             self.dataset = data['dataset']
             self.user_id_map = data['user_id_map']
@@ -644,7 +656,15 @@ class LightFMService:
             self.reverse_user_map = data['reverse_user_map']
             self.reverse_item_map = data['reverse_item_map']
         except Exception as e:
-            raise ValueError(f"Erro ao carregar modelo: {e}")
+            error_msg = str(e)
+            if "BitGenerator" in error_msg or "MT19937" in error_msg:
+                raise ValueError(
+                    f"Erro de compatibilidade NumPy ao carregar modelo. "
+                    f"O modelo foi salvo com uma versão diferente do NumPy. "
+                    f"Recomendação: Retreine o modelo com a versão atual do NumPy. "
+                    f"Erro original: {error_msg}"
+                )
+            raise ValueError(f"Erro ao carregar modelo: {error_msg}")
     
     def is_model_loaded(self) -> bool:
         """Verifica se o modelo está carregado"""
