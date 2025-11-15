@@ -27,6 +27,10 @@ models/*.pkl
 backend/models/*.pkl
 test_models/
 
+# MLflow
+mlruns/
+mlartifacts/
+
 # Database
 *.db
 *.sqlite

@@ -16,4 +16,5 @@ joblib
 pandas
 requests
 email-validator
+mlflow>=2.8.0
 

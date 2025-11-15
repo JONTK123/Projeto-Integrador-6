@@ -1,0 +1,206 @@
+============================================================
+JSONs PARA TREINAMENTO - POSTMAN
+Endpoint: POST http://localhost:8000/recomendacoes/treinar
+============================================================
+
+1. CONFIGURAÇÃO BÁSICA (Recomendada para começar)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm",
+  "usar_features": true,
+  "loss": "warp",
+  "num_epochs": 30,
+  "learning_rate": 0.05,
+  "num_components": 30
+}
+
+2. CONFIGURAÇÃO RÁPIDA (Para testes)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm",
+  "usar_features": true,
+  "loss": "warp",
+  "num_epochs": 10,
+  "learning_rate": 0.05,
+  "num_components": 20
+}
+
+3. CONFIGURAÇÃO ALTA QUALIDADE (Melhor performance)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm",
+  "usar_features": true,
+  "loss": "warp",
+  "num_epochs": 50,
+  "learning_rate": 0.03,
+  "num_components": 50
+}
+
+4. CONFIGURAÇÃO BPR (Bayesian Personalized Ranking)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm",
+  "usar_features": true,
+  "loss": "bpr",
+  "num_epochs": 30,
+  "learning_rate": 0.05,
+  "num_components": 30
+}
+
+5. CONFIGURAÇÃO LOGISTIC (Classificação Binária)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm",
+  "usar_features": true,
+  "loss": "logistic",
+  "num_epochs": 30,
+  "learning_rate": 0.05,
+  "num_components": 30
+}
+
+6. CONFIGURAÇÃO SEM FEATURES (Apenas Collaborative Filtering)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm",
+  "usar_features": false,
+  "loss": "warp",
+  "num_epochs": 30,
+  "learning_rate": 0.05,
+  "num_components": 30
+}
+
+7. CONFIGURAÇÃO EMBEDDINGS GRANDES (Mais capacidade)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm",
+  "usar_features": true,
+  "loss": "warp",
+  "num_epochs": 40,
+  "learning_rate": 0.04,
+  "num_components": 64
+}
+
+8. CONFIGURAÇÃO EMBEDDINGS PEQUENOS (Mais rápido)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm",
+  "usar_features": true,
+  "loss": "warp",
+  "num_epochs": 30,
+  "learning_rate": 0.05,
+  "num_components": 16
+}
+
+9. CONFIGURAÇÃO LEARNING RATE ALTO (Aprendizado rápido)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm",
+  "usar_features": true,
+  "loss": "warp",
+  "num_epochs": 20,
+  "learning_rate": 0.1,
+  "num_components": 30
+}
+
+10. CONFIGURAÇÃO LEARNING RATE BAIXO (Aprendizado suave)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm",
+  "usar_features": true,
+  "loss": "warp",
+  "num_epochs": 50,
+  "learning_rate": 0.01,
+  "num_components": 30
+}
+
+11. CONFIGURAÇÃO MÍNIMA (Apenas obrigatórios - usa padrões)
+-------------------------------------------------
+{
+  "algoritmo": "lightfm"
+}
+
+============================================================
+INSTRUÇÕES PARA POSTMAN
+============================================================
+
+1. Método: POST
+2. URL: http://localhost:8000/recomendacoes/treinar
+3. Headers:
+   - Key: Content-Type
+   - Value: application/json
+4. Body: 
+   - Selecione "raw"
+   - Selecione "JSON" no dropdown
+   - Cole um dos JSONs acima
+5. Clique em "Send"
+
+============================================================
+PARÂMETROS EXPLICADOS
+============================================================
+
+algoritmo (obrigatório):
+  - Valores: "lightfm" ou "surprise"
+  - Descrição: Algoritmo de recomendação
+
+usar_features (opcional, padrão: true):
+  - Valores: true ou false
+  - Descrição: Se true, usa features (Content-Based). 
+               Se false, usa apenas Collaborative Filtering
+
+loss (opcional, padrão: "warp"):
+  - Valores: "warp", "bpr", "logistic"
+  - Descrição: Função de perda
+    * "warp": Ranking (recomendado)
+    * "bpr": Feedback implícito
+    * "logistic": Classificação binária
+
+num_epochs (opcional, padrão: 30):
+  - Valores: 10-100 (recomendado: 20-50)
+  - Descrição: Número de épocas. Mais = melhor qualidade mas mais lento
+
+learning_rate (opcional, padrão: 0.05):
+  - Valores: 0.01-0.1 (recomendado: 0.03-0.05)
+  - Descrição: Taxa de aprendizado. Alto = rápido mas pode ser instável
+
+num_components (opcional, padrão: 30):
+  - Valores: 16-128 (recomendado: 30-50)
+  - Descrição: Dimensão dos embeddings. Maior = mais capacidade mas mais lento
+
+============================================================
+RECOMENDAÇÕES
+============================================================
+
+- Primeiro treinamento: Use configuração #1 (Básica)
+- Testes rápidos: Use configuração #2 (Rápida)
+- Melhor qualidade: Use configuração #3 (Alta Qualidade)
+- Comparar algoritmos: Treine com diferentes "loss" (#1, #4, #5)
+- Comparar features: Treine com e sem features (#1 vs #6)
+- Otimização: Teste diferentes combinações e compare no MLflow UI
+
+============================================================
+RESPOSTA ESPERADA
+============================================================
+
+Sucesso:
+{
+  "message": "Modelo LightFM treinado com sucesso (via VENV)",
+  "algoritmo": "lightfm",
+  "metricas": {
+    "train_precision@10": 0.45,
+    "test_precision@10": 0.42,
+    "test_precision@5": 0.38,
+    "test_precision@20": 0.44,
+    "train_recall@10": 0.35,
+    "test_recall@5": 0.28,
+    "test_recall@10": 0.32,
+    "train_auc": 0.78,
+    "test_auc": 0.75,
+    "train_mrr": 0.62,
+    "test_mrr": 0.58,
+    "test_f1@5": 0.32,
+    "test_f1@10": 0.36
+  }
+}
+
+============================================================
+
