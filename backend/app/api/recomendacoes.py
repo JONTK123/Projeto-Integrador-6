@@ -28,14 +28,43 @@ lightfm_service = None
 if LIGHTFM_AVAILABLE:
     try:
         lightfm_service = LightFMService()
-        # Tentar carregar modelo se existir
+        # Tentar carregar modelo do MLflow primeiro (se disponível)
+        model_loaded = False
+        
+        # Tentar carregar do MLflow (modelo em produção)
         try:
-            lightfm_service.load_model()
-            print("✅ LightFM: Modelo carregado com sucesso!")
-        except FileNotFoundError:
-            print("ℹ️  LightFM: Modelo ainda não foi treinado")
-        except Exception as e:
-            print(f"⚠️  LightFM: Erro ao carregar modelo: {e}")
+            from app.services.lightfm_service import MLFLOW_AVAILABLE as MLFLOW_SERVICE_AVAILABLE
+            if MLFLOW_SERVICE_AVAILABLE:
+                model_info = lightfm_service.load_model_from_mlflow(use_production=True)
+                print(f"✅ LightFM: Modelo carregado do MLflow (Produção)")
+                print(f"   Run ID: {model_info.get('run_id', 'N/A')}")
+                model_loaded = True
+        except (FileNotFoundError, ValueError, ImportError) as e:
+            # MLflow não disponível ou sem modelo - tentar arquivo local
+            error_msg = str(e)
+            if "Failed to download artifacts" in error_msg or "Erro ao carregar melhor modelo" in error_msg:
+                print(f"ℹ️  LightFM: Runs antigos não têm modelo salvo corretamente")
+                print(f"   Treine um novo modelo para usar o MLflow")
+            else:
+                print(f"ℹ️  LightFM: MLflow não disponível: {error_msg[:80]}")
+        
+        # Se não carregou do MLflow, tentar arquivo local
+        if not model_loaded:
+            try:
+                lightfm_service.load_model_from_mlflow(use_production=False)
+                print("✅ LightFM: Modelo carregado do MLflow (Melhor modelo)")
+                model_loaded = True
+            except Exception as e:
+                print(f"⚠️  LightFM: Erro ao carregar modelo: {e}")
+                print("   Tentando carregar do arquivo local...")
+                try:
+                    lightfm_service.load_model()
+                    print("✅ LightFM: Modelo carregado do arquivo local!")
+                    model_loaded = True
+                except FileNotFoundError:
+                    print("ℹ️  LightFM: Modelo ainda não foi treinado")
+                except Exception as e:
+                    print(f"⚠️  LightFM: Erro ao carregar modelo: {e}")
     except Exception as e:
         print(f"⚠️  LightFM Service não pôde ser inicializado: {e}")
         LIGHTFM_AVAILABLE = False
@@ -801,11 +830,39 @@ def treinar_modelo(
                         use_features=request.usar_features,
                         num_epochs=request.num_epochs or 30,
                         learning_rate=request.learning_rate or 0.05,
-                        num_components=request.num_components or 30
+                        num_components=request.num_components or 30,
+                        use_mlflow=True  # Garantir que MLflow seja usado
                     )
                     
                     # Salvar modelo
                     lightfm_service.save_model()
+                    
+                    # Selecionar e recarregar melhor modelo do MLflow
+                    try:
+                        from app.services.lightfm_service import MLFLOW_AVAILABLE as MLFLOW_SERVICE_AVAILABLE
+                        if MLFLOW_SERVICE_AVAILABLE:
+                            try:
+                                # NÃO chamar mark_best_as_production aqui - já foi chamado no treinamento!
+                                # Apenas carregar o melhor modelo
+                                model_info = lightfm_service.load_model_from_mlflow(use_production=True)
+                                print(f"🔄 Melhor modelo carregado do MLflow")
+                                print(f"   Run ID: {model_info.get('run_id', 'N/A')[:8]}...")
+                                if 'metrics' in model_info:
+                                    precision = model_info['metrics'].get('test_precision_at_10', 'N/A')
+                                    if precision != 'N/A':
+                                        try:
+                                            if hasattr(precision, 'value'):
+                                                precision = float(precision.value)
+                                            else:
+                                                precision = float(precision)
+                                            print(f"   Métricas: Precision@10={precision:.4f}")
+                                        except:
+                                            print(f"   Métricas: Precision@10={precision}")
+                            except Exception as reload_error:
+                                print(f"⚠️  Não foi possível recarregar melhor modelo do MLflow: {reload_error}")
+                                print(f"   O modelo treinado será usado. Reinicie o servidor para carregar o melhor modelo.")
+                    except Exception as e:
+                        print(f"ℹ️  MLflow não disponível para recarregamento: {e}")
                     
                     return {
                         "message": "Modelo LightFM treinado com sucesso (via VENV)",
